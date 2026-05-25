@@ -87,6 +87,13 @@ top_img: false
         <div class="skill-field">
           <span>所属领域</span>
           <div id="skillDomainChoices" class="skill-choice-list"></div>
+          <div class="skill-domain-editor-head">
+            <span>领域库</span>
+            <button id="skillAddDomain" class="skill-button skill-button-mini" type="button" title="新增一个可勾选的领域">
+              <i class="fas fa-plus"></i><span>新增领域</span>
+            </button>
+          </div>
+          <div id="skillDomainManager" class="skill-domain-manager"></div>
         </div>
 
         <div class="skill-field">

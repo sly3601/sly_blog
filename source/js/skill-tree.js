@@ -5,6 +5,7 @@
   const CLOUD_TOKEN_KEY = 'sly_blog_skill_tree_cloud_token';
   const WORLD = { width: 3600, height: 2400 };
   const NODE_SIZE = { width: 244, height: 104 };
+  const DOMAIN_LIMIT = 18;
   const stateLabels = {
     locked: '未解锁',
     current: '修炼中',
@@ -52,6 +53,8 @@
     state: document.getElementById('skillState'),
     perk: document.getElementById('skillPerk'),
     domainChoices: document.getElementById('skillDomainChoices'),
+    domainManager: document.getElementById('skillDomainManager'),
+    addDomain: document.getElementById('skillAddDomain'),
     prereqChoices: document.getElementById('skillPrereqChoices'),
     link: document.getElementById('skillLink'),
     notes: document.getElementById('skillNotes')
@@ -190,7 +193,7 @@
     const fallback = defaultDomains();
     if (!Array.isArray(input) || !input.length) return fallback;
     const used = new Set();
-    return input.slice(0, 10).map((domain, index) => {
+    return input.slice(0, DOMAIN_LIMIT).map((domain, index) => {
       const fallbackDomain = fallback[index % fallback.length];
       let id = String(domain.id || fallbackDomain.id || `domain-${index + 1}`).trim();
       if (!id || used.has(id)) id = `domain-${index + 1}`;
@@ -248,6 +251,23 @@
 
   function createId() {
     return `skill-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  }
+
+  function createDomainId() {
+    let id;
+    do {
+      id = `domain-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`;
+    } while (tree.domains.some((domain) => domain.id === id));
+    return id;
+  }
+
+  function nextDomainColor() {
+    const palette = ['#65d8ff', '#86e57e', '#b991ff', '#ff9f5d', '#ffd36b', '#ff7ca8', '#5ee0c1', '#e2f06e'];
+    return palette[tree.domains.length % palette.length];
+  }
+
+  function cleanDomainColor(value, fallback = '#f2c35b') {
+    return /^#[0-9a-f]{6}$/i.test(value || '') ? value : fallback;
   }
 
   function clamp(value, min, max) {
@@ -528,6 +548,7 @@
     els.link.value = item.link;
     els.notes.value = item.notes;
     renderDomainChoices(item);
+    renderDomainManager();
     renderPrereqChoices(item);
     els.delete.disabled = item.id === 'root';
     els.addSibling.disabled = item.id === 'root';
@@ -545,6 +566,27 @@
     });
   }
 
+  function renderDomainManager() {
+    els.domainManager.innerHTML = tree.domains.map((domain) => `
+      <div class="skill-domain-row" data-domain-id="${escapeHtml(domain.id)}" style="--domain-color:${escapeHtml(domain.color)}">
+        <input class="skill-domain-color" data-domain-field="color" type="color" value="${escapeHtml(domain.color)}" title="领域颜色">
+        <input class="skill-domain-icon" data-domain-field="icon" type="text" maxlength="2" value="${escapeHtml(domain.icon)}" title="领域图标">
+        <input class="skill-domain-title" data-domain-field="title" type="text" maxlength="24" value="${escapeHtml(domain.title)}" title="领域名称">
+        <button class="skill-domain-delete" data-domain-delete="${escapeHtml(domain.id)}" type="button" title="删除领域" ${tree.domains.length <= 1 ? 'disabled' : ''}>
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+    `).join('');
+    els.domainManager.querySelectorAll('[data-domain-field]').forEach((input) => {
+      input.addEventListener('input', updateDomainFromManager);
+      input.addEventListener('change', updateDomainFromManager);
+    });
+    els.domainManager.querySelectorAll('[data-domain-delete]').forEach((button) => {
+      button.addEventListener('click', () => deleteDomain(button.dataset.domainDelete));
+    });
+    els.addDomain.disabled = tree.domains.length >= DOMAIN_LIMIT;
+  }
+
   function renderPrereqChoices(item) {
     const descendants = new Set(collectDescendants(item.id));
     els.prereqChoices.innerHTML = tree.nodes
@@ -558,6 +600,75 @@
     els.prereqChoices.querySelectorAll('input').forEach((input) => {
       input.addEventListener('change', updateSelectedFromForm);
     });
+  }
+
+  function updateDomainFromManager(event) {
+    const row = event.target.closest('.skill-domain-row');
+    if (!row) return;
+    const domain = tree.domains.find((item) => item.id === row.dataset.domainId);
+    if (!domain) return;
+
+    const field = event.target.dataset.domainField;
+    if (field === 'title') {
+      domain.title = event.target.value.trim() || '未命名领域';
+    } else if (field === 'icon') {
+      domain.icon = (event.target.value.trim() || '◆').slice(0, 2);
+    } else if (field === 'color') {
+      domain.color = cleanDomainColor(event.target.value, domain.color);
+      row.style.setProperty('--domain-color', domain.color);
+    }
+
+    refreshDomainSurfaces();
+    scheduleSave();
+  }
+
+  function addDomain() {
+    if (tree.domains.length >= DOMAIN_LIMIT) {
+      showToast(`最多保留 ${DOMAIN_LIMIT} 个领域`);
+      return;
+    }
+
+    tree.domains.push({
+      id: createDomainId(),
+      title: `新领域 ${tree.domains.length + 1}`,
+      icon: '◆',
+      color: nextDomainColor()
+    });
+    render();
+    saveTree('已新增领域');
+  }
+
+  function deleteDomain(id) {
+    if (tree.domains.length <= 1) {
+      showToast('至少要保留一个领域');
+      return;
+    }
+
+    const domain = tree.domains.find((item) => item.id === id);
+    if (!domain) return;
+    const usageCount = tree.nodes.filter((item) => item.domains.includes(id)).length;
+    const ok = window.confirm(`确定删除「${domain.title}」吗？它会从 ${usageCount} 个节点的所属领域里移除。`);
+    if (!ok) return;
+
+    tree.domains = tree.domains.filter((item) => item.id !== id);
+    const validDomains = new Set(tree.domains.map((item) => item.id));
+    const fallbackDomain = tree.domains[0].id;
+    tree.nodes.forEach((item) => {
+      item.domains = item.domains.filter((domainId) => validDomains.has(domainId));
+      if (!item.domains.length) item.domains = [fallbackDomain];
+    });
+    render();
+    saveTree('已删除领域');
+  }
+
+  function refreshDomainSurfaces() {
+    const item = getNode(selectedId);
+    renderLinks();
+    renderNodes();
+    if (item) {
+      renderDomainChoices(item);
+      renderPrereqChoices(item);
+    }
   }
 
   function applyView() {
@@ -880,6 +991,7 @@
   els.addChild.addEventListener('click', () => addNode(selectedId));
   els.addSibling.addEventListener('click', addSibling);
   els.delete.addEventListener('click', deleteSelected);
+  els.addDomain.addEventListener('click', addDomain);
   els.layout.addEventListener('click', autoLayout);
   els.fit.addEventListener('click', () => {
     fitToTree();

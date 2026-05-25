@@ -109,7 +109,7 @@ function normalizeDomains(input) {
   const fallback = defaultDomains();
   if (!Array.isArray(input) || !input.length) return fallback;
   const used = new Set();
-  return input.slice(0, 10).map((domain, index) => {
+  return input.slice(0, 18).map((domain, index) => {
     const fallbackDomain = fallback[index % fallback.length];
     let id = trimText(domain.id, 80) || fallbackDomain.id || `domain-${index + 1}`;
     if (used.has(id)) id = `domain-${index + 1}`;
