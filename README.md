@@ -1,4 +1,4 @@
-# Sly Blog
+# sly_blog
 
 这是一个基于 Hexo 和 Butterfly 主题的个人博客。
 
@@ -9,7 +9,7 @@ npm install
 npm run server
 ```
 
-默认本地预览地址是 `http://localhost:4000/sly_blog/`。
+默认本地预览地址是 `http://localhost:4000/sly_blog/`。如果 4000 端口被占用，可以运行 `npm run server -- --port 4001`，然后访问 `http://localhost:4001/sly_blog/`。
 
 ## 常用命令
 
