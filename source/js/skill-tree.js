@@ -1,5 +1,8 @@
 (function () {
   const STORAGE_KEY = 'sly_blog_skill_tree_v1';
+  const CLOUD_ENDPOINT_KEY = 'sly_blog_skill_tree_cloud_endpoint';
+  const CLOUD_TOKEN_KEY = 'sly_blog_skill_tree_cloud_token';
+  let CLOUD_CONFIG = {};
   const WORLD = { width: 3200, height: 2200 };
   const NODE_SIZE = { width: 228, height: 82 };
   const stateLabels = {
@@ -11,6 +14,10 @@
 
   const app = document.getElementById('skill-tree-app');
   if (!app) return;
+  CLOUD_CONFIG = {
+    endpoint: app.dataset.cloudEndpoint || '',
+    autoLoad: app.dataset.cloudAutoload !== 'false'
+  };
   document.body.classList.add('skill-tree-page');
 
   const els = {
@@ -27,7 +34,13 @@
     save: document.getElementById('skillSave'),
     export: document.getElementById('skillExport'),
     import: document.getElementById('skillImport'),
+    cloudLoad: document.getElementById('skillCloudLoad'),
+    cloudSave: document.getElementById('skillCloudSave'),
     importFile: document.getElementById('skillImportFile'),
+    cloudEndpoint: document.getElementById('skillCloudEndpoint'),
+    cloudToken: document.getElementById('skillCloudToken'),
+    cloudClear: document.getElementById('skillCloudClear'),
+    cloudBadge: document.getElementById('skillCloudBadge'),
     reset: document.getElementById('skillReset'),
     zoomIn: document.getElementById('skillZoomIn'),
     zoomOut: document.getElementById('skillZoomOut'),
@@ -202,6 +215,182 @@
     if (!url) return '';
     if (/^(https?:\/\/|\/)/i.test(url)) return url;
     return '';
+  }
+
+  function normalizeEndpoint(value) {
+    return String(value || '').trim().replace(/\/+$/, '');
+  }
+
+  function getCloudEndpoint() {
+    return normalizeEndpoint(els.cloudEndpoint && els.cloudEndpoint.value);
+  }
+
+  function getCloudToken() {
+    return String((els.cloudToken && els.cloudToken.value) || '').trim();
+  }
+
+  function rememberCloudConfig() {
+    const endpoint = getCloudEndpoint();
+    const token = getCloudToken();
+    if (endpoint) {
+      localStorage.setItem(CLOUD_ENDPOINT_KEY, endpoint);
+    } else {
+      localStorage.removeItem(CLOUD_ENDPOINT_KEY);
+    }
+    if (token) {
+      localStorage.setItem(CLOUD_TOKEN_KEY, token);
+    } else {
+      localStorage.removeItem(CLOUD_TOKEN_KEY);
+    }
+    updateCloudBadge();
+  }
+
+  function initCloudControls() {
+    if (!els.cloudEndpoint || !els.cloudToken) return;
+    const configuredEndpoint = normalizeEndpoint(CLOUD_CONFIG.endpoint);
+    const storedEndpoint = normalizeEndpoint(localStorage.getItem(CLOUD_ENDPOINT_KEY));
+    const storedToken = localStorage.getItem(CLOUD_TOKEN_KEY) || '';
+    els.cloudEndpoint.value = storedEndpoint || configuredEndpoint || '';
+    els.cloudToken.value = storedToken;
+    updateCloudBadge();
+  }
+
+  function updateCloudBadge(mode) {
+    if (!els.cloudBadge) return;
+    const endpoint = getCloudEndpoint();
+    els.cloudBadge.classList.remove('is-ready', 'is-error');
+    if (mode === 'error') {
+      els.cloudBadge.textContent = '连接失败';
+      els.cloudBadge.classList.add('is-error');
+      return;
+    }
+    if (mode === 'saved') {
+      els.cloudBadge.textContent = '云端已保存';
+      els.cloudBadge.classList.add('is-ready');
+      return;
+    }
+    if (mode === 'loaded') {
+      els.cloudBadge.textContent = '云端已读取';
+      els.cloudBadge.classList.add('is-ready');
+      return;
+    }
+    if (endpoint) {
+      els.cloudBadge.textContent = '已配置';
+      els.cloudBadge.classList.add('is-ready');
+    } else {
+      els.cloudBadge.textContent = '未配置';
+    }
+  }
+
+  function cloudApiUrl() {
+    const endpoint = getCloudEndpoint();
+    return endpoint ? `${endpoint}/skill-tree` : '';
+  }
+
+  async function loadCloudTree(options = {}) {
+    const url = cloudApiUrl();
+    if (!url) {
+      showToast('先填写云端接口地址');
+      updateCloudBadge();
+      return false;
+    }
+
+    try {
+      setStatus('正在读取云端...');
+      rememberCloudConfig();
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+        cache: 'no-store'
+      });
+
+      if (response.status === 404) {
+        if (!options.silent) showToast('云端还没有数据，先点一次云端保存');
+        setStatus('云端暂无数据');
+        return false;
+      }
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const payload = await response.json();
+      const incomingTree = payload && payload.tree ? payload.tree : payload;
+      tree = normalizeTree(incomingTree);
+      selectedId = tree.selectedId || 'root';
+      render();
+      saveTree();
+      setStatus('云端已同步');
+      updateCloudBadge('loaded');
+      if (!options.silent) showToast('已从云端读取技能树');
+      return true;
+    } catch (error) {
+      console.error(error);
+      updateCloudBadge('error');
+      setStatus('云端读取失败');
+      if (!options.silent) showToast('云端读取失败，已保留本地数据');
+      return false;
+    }
+  }
+
+  async function saveCloudTree() {
+    const url = cloudApiUrl();
+    if (!url) {
+      showToast('先填写云端接口地址');
+      updateCloudBadge();
+      return;
+    }
+
+    let token = getCloudToken();
+    if (!token) {
+      token = window.prompt('请输入管理员密钥，密钥只会保存在当前浏览器：') || '';
+      if (!token.trim()) {
+        showToast('已取消云端保存');
+        return;
+      }
+      els.cloudToken.value = token.trim();
+    }
+
+    try {
+      rememberCloudConfig();
+      saveTree();
+      setStatus('正在保存到云端...');
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token.trim()}`
+        },
+        body: JSON.stringify(tree)
+      });
+
+      if (response.status === 401 || response.status === 403) {
+        showToast('管理员密钥不对，云端没有保存');
+        setStatus('云端保存失败');
+        updateCloudBadge('error');
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const payload = await response.json().catch(() => null);
+      if (payload && payload.tree) {
+        tree = normalizeTree(payload.tree);
+        selectedId = tree.selectedId || selectedId;
+        render();
+        saveTree();
+      }
+      setStatus('云端已保存');
+      updateCloudBadge('saved');
+      showToast('已保存到云端，访客刷新后会看到新版');
+    } catch (error) {
+      console.error(error);
+      setStatus('云端保存失败');
+      updateCloudBadge('error');
+      showToast('云端保存失败，本地数据仍已保留');
+    }
   }
 
   function render() {
@@ -586,6 +775,18 @@
     importTree(els.importFile.files && els.importFile.files[0]);
     els.importFile.value = '';
   });
+  els.cloudLoad.addEventListener('click', () => loadCloudTree());
+  els.cloudSave.addEventListener('click', saveCloudTree);
+  els.cloudEndpoint.addEventListener('change', rememberCloudConfig);
+  els.cloudToken.addEventListener('change', rememberCloudConfig);
+  els.cloudClear.addEventListener('click', () => {
+    els.cloudEndpoint.value = '';
+    els.cloudToken.value = '';
+    localStorage.removeItem(CLOUD_ENDPOINT_KEY);
+    localStorage.removeItem(CLOUD_TOKEN_KEY);
+    updateCloudBadge();
+    showToast('已清除当前浏览器里的云端配置');
+  });
   els.reset.addEventListener('click', resetTree);
 
   els.viewport.addEventListener('pointerdown', startPan);
@@ -610,7 +811,11 @@
     applyView();
   });
 
+  initCloudControls();
   render();
   fitToTree();
   saveTree();
+  if (getCloudEndpoint() && CLOUD_CONFIG.autoLoad !== false) {
+    loadCloudTree({ silent: true });
+  }
 })();

@@ -9,7 +9,7 @@ top_img: false
 {% raw %}
 <link rel="stylesheet" href="/sly_blog/css/skill-tree.css">
 
-<div id="skill-tree-app" class="skill-app">
+<div id="skill-tree-app" class="skill-app" data-cloud-endpoint="" data-cloud-autoload="true">
   <section class="skill-shell" aria-label="技能树编辑器">
     <header class="skill-header">
       <div>
@@ -25,6 +25,12 @@ top_img: false
         </button>
         <button id="skillImport" class="skill-button" type="button" title="导入 JSON 备份">
           <i class="fas fa-file-import"></i><span>导入</span>
+        </button>
+        <button id="skillCloudLoad" class="skill-button" type="button" title="从云端读取最新技能树">
+          <i class="fas fa-cloud-download-alt"></i><span>云端读取</span>
+        </button>
+        <button id="skillCloudSave" class="skill-button skill-button-cloud" type="button" title="保存到云端">
+          <i class="fas fa-cloud-upload-alt"></i><span>云端保存</span>
         </button>
         <input id="skillImportFile" type="file" accept="application/json,.json" hidden>
       </div>
@@ -104,6 +110,24 @@ top_img: false
         <button id="skillReset" class="skill-button skill-button-wide" type="button">
           <i class="fas fa-undo"></i><span>恢复初始模板</span>
         </button>
+
+        <div class="skill-cloud-card">
+          <div class="skill-panel-section">
+            <p class="skill-panel-title">云端</p>
+            <span id="skillCloudBadge" class="skill-cloud-badge">未配置</span>
+          </div>
+          <label class="skill-field">
+            <span>接口地址</span>
+            <input id="skillCloudEndpoint" type="url" placeholder="部署 Worker 后填这里">
+          </label>
+          <label class="skill-field">
+            <span>管理员密钥</span>
+            <input id="skillCloudToken" type="password" autocomplete="off" placeholder="只保存在你的浏览器">
+          </label>
+          <button id="skillCloudClear" class="skill-button skill-button-wide" type="button">
+            <i class="fas fa-key"></i><span>清除云端配置</span>
+          </button>
+        </div>
       </aside>
 
       <main class="skill-canvas" aria-label="技能树画布">

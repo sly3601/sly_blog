@@ -6,3 +6,6 @@ db.json
 .DS_Store
 Thumbs.db
 219_ws/
+.wrangler/
+workers/**/wrangler.toml
+!workers/**/wrangler.toml.example

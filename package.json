@@ -8,7 +8,8 @@
     "new": "hexo new",
     "server": "hexo server",
     "start": "hexo server",
-    "optimize": "gulp"
+    "optimize": "gulp",
+    "deploy:skill-api": "npx wrangler deploy --config workers/skill-tree-api/wrangler.toml"
   },
   "hexo": {
     "version": "7.3.0"

@@ -95,6 +95,11 @@ body.skill-tree-page #page .page-title {
   background: linear-gradient(180deg, #8b5a22, #5e3818);
 }
 
+.skill-button-cloud {
+  border-color: rgba(111, 205, 255, 0.68);
+  background: linear-gradient(180deg, #315f78, #1f3948);
+}
+
 .skill-button-wide {
   width: 100%;
   margin-top: 6px;
@@ -151,6 +156,36 @@ body.skill-tree-page #page .page-title {
   margin: 0;
   color: #ffd98a;
   font-weight: 800;
+}
+
+.skill-cloud-card {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(217, 168, 85, 0.24);
+}
+
+.skill-cloud-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 9px;
+  border: 1px solid rgba(217, 168, 85, 0.3);
+  border-radius: 999px;
+  color: #d9c8a7;
+  background: rgba(8, 9, 12, 0.48);
+  font-size: 0.74rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.skill-cloud-badge.is-ready {
+  color: #aee6ff;
+  border-color: rgba(111, 205, 255, 0.48);
+}
+
+.skill-cloud-badge.is-error {
+  color: #ffc5bc;
+  border-color: rgba(220, 91, 72, 0.58);
 }
 
 .skill-field {
