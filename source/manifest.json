@@ -1,0 +1,42 @@
+{
+    "name": "熠只猪`Blog",
+    "short_name": "熠只猪",
+    "theme_color": "#fcc73b",
+    "background_color": "#fcc73b",
+    "display": "standalone",
+    "scope": "/sly_blog/",
+    "start_url": "/sly_blog/",
+    "icons": [
+      {
+        "src": "/sly_blog/img/siteicon/16.png",
+        "sizes": "16x16",
+        "type": "image/png"
+      },
+      {
+        "src": "/sly_blog/img/siteicon/32.png",
+        "sizes": "32x32",
+        "type": "image/png"
+      },
+      {
+        "src": "/sly_blog/img/siteicon/48.png",
+        "sizes": "48x48",
+        "type": "image/png"
+      },
+      {
+        "src": "/sly_blog/img/siteicon/64.png",
+        "sizes": "64x64",
+        "type": "image/png"
+      },
+      {
+        "src": "/sly_blog/img/siteicon/128.png",
+        "sizes": "128x128",
+        "type": "image/png"
+      },
+      {
+        "src": "/sly_blog/img/siteicon/256.png",
+        "sizes": "256x256",
+        "type": "image/png"
+      }
+    ],
+    "splash_pages": null
+  }
