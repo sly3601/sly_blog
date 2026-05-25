@@ -1,20 +1,30 @@
 (function () {
-  const STORAGE_KEY = 'sly_blog_skill_tree_v1';
+  const STORAGE_KEY = 'sly_blog_skill_tree_v2';
+  const LEGACY_STORAGE_KEY = 'sly_blog_skill_tree_v1';
   const CLOUD_ENDPOINT_KEY = 'sly_blog_skill_tree_cloud_endpoint';
   const CLOUD_TOKEN_KEY = 'sly_blog_skill_tree_cloud_token';
-  let CLOUD_CONFIG = {};
-  const WORLD = { width: 3200, height: 2200 };
-  const NODE_SIZE = { width: 228, height: 82 };
+  const GRID = {
+    left: 214,
+    top: 104,
+    colWidth: 220,
+    rowMinHeight: 138,
+    nodeWidth: 178,
+    nodeHeight: 92,
+    slotGap: 44,
+    rightPad: 180,
+    bottomPad: 120
+  };
   const stateLabels = {
-    locked: '未解锁',
-    current: '修炼中',
+    locked: '锁定',
+    current: '可学习',
     done: '已掌握',
-    master: '宗师'
+    master: '核心'
   };
 
   const app = document.getElementById('skill-tree-app');
   if (!app) return;
-  CLOUD_CONFIG = {
+
+  const cloudConfig = {
     endpoint: app.dataset.cloudEndpoint || '',
     autoLoad: app.dataset.cloudAutoload !== 'false'
   };
@@ -49,95 +59,97 @@
     subtitle: document.getElementById('skillSubtitle'),
     icon: document.getElementById('skillIcon'),
     state: document.getElementById('skillState'),
+    branch: document.getElementById('skillBranch'),
+    tier: document.getElementById('skillTier'),
+    perk: document.getElementById('skillPerk'),
     link: document.getElementById('skillLink'),
     notes: document.getElementById('skillNotes')
   };
 
   let tree = loadTree();
   let selectedId = tree.selectedId || 'root';
-  let dragNode = null;
   let panState = null;
   let saveTimer = null;
   let toastTimer = null;
+  let latestLayout = null;
+
+  function defaultBranches() {
+    return [
+      { id: 'core', title: '殖民基础', icon: '⌂', color: '#f2c35b' },
+      { id: 'perception', title: '机器人感知', icon: '◉', color: '#6fd1ff' },
+      { id: 'control', title: '运动控制', icon: '⚙', color: '#83df7a' },
+      { id: 'ai', title: 'AI 工程', icon: '◆', color: '#b18cff' },
+      { id: 'deploy', title: '系统部署', icon: '▣', color: '#ff9f5d' },
+      { id: 'business', title: '知识付费', icon: '♜', color: '#ffcf6d' }
+    ];
+  }
+
+  function defaultTiers() {
+    return [
+      { level: 1, title: 'Tier 1', morale: '+0' },
+      { level: 2, title: 'Tier 2', morale: '+1' },
+      { level: 3, title: 'Tier 3', morale: '+2' },
+      { level: 4, title: 'Tier 4', morale: '+4' },
+      { level: 5, title: 'Tier 5', morale: '+6' },
+      { level: 6, title: 'Tier 6', morale: '+8' }
+    ];
+  }
 
   function starterTree() {
     return {
-      version: 1,
+      version: 2,
+      layout: 'oni-grid',
       selectedId: 'root',
-      view: { x: 0, y: 0, scale: 0.8 },
+      view: { x: 0, y: 0, scale: 0.78 },
+      branches: defaultBranches(),
+      tiers: defaultTiers(),
       nodes: [
-        {
-          id: 'root',
-          parent: null,
-          title: '全栈机器人术士',
-          subtitle: '从这里展开你的知识版图',
-          icon: '✦',
-          state: 'master',
-          link: '',
-          notes: '中心节点不能删除，可以改名。',
-          x: 1600,
-          y: 1100
-        },
-        {
-          id: 'node-perception',
-          parent: 'root',
-          title: '机器人感知',
-          subtitle: '视觉、点云、多模态',
-          icon: '☉',
-          state: 'current',
-          link: '',
-          notes: '',
-          x: 1240,
-          y: 850
-        },
-        {
-          id: 'node-control',
-          parent: 'root',
-          title: '运动控制',
-          subtitle: '规划、控制、仿真',
-          icon: '⚙',
-          state: 'current',
-          link: '',
-          notes: '',
-          x: 1960,
-          y: 850
-        },
-        {
-          id: 'node-ai',
-          parent: 'root',
-          title: 'AI 工程',
-          subtitle: '模型、数据、部署',
-          icon: '◆',
-          state: 'done',
-          link: '',
-          notes: '',
-          x: 1240,
-          y: 1350
-        },
-        {
-          id: 'node-business',
-          parent: 'root',
-          title: '知识付费',
-          subtitle: '课程、咨询、案例',
-          icon: '♜',
-          state: 'locked',
-          link: '',
-          notes: '',
-          x: 1960,
-          y: 1350
-        }
+        node('root', null, '基地入门', '技能树起点', '⌂', 'master', 'core', 1, 0, '+1 学习效率'),
+        node('core-ops', 'root', '殖民运维', '资源、氧气、日程', '▤', 'done', 'core', 2, 0, '+1 系统规划'),
+        node('core-research', 'core-ops', '科研调度', '论文、实验、复盘', '✚', 'current', 'core', 3, 0, '+1 研究速度'),
+        node('core-lab', 'core-research', '实验室自动化', '工具链与流水线', '⚗', 'locked', 'core', 4, 0, '解锁实验模板'),
+        node('perception-cv', 'root', '视觉感知', '相机、检测、分割', '◉', 'done', 'perception', 2, 0, '+1 图像理解'),
+        node('perception-lidar', 'perception-cv', '点云建图', '深度、雷达、融合', '◎', 'current', 'perception', 3, 0, '+1 空间理解'),
+        node('perception-multi', 'perception-lidar', '多模态感知', '视觉语言与传感器', '✦', 'locked', 'perception', 4, 0, '解锁跨模态任务'),
+        node('control-plan', 'root', '运动规划', '路径、轨迹、约束', '↝', 'current', 'control', 2, 0, '+1 轨迹规划'),
+        node('control-sim', 'control-plan', '仿真训练', 'Isaac、Gazebo、Mujoco', '⚙', 'current', 'control', 3, 0, '+1 仿真效率'),
+        node('control-real', 'control-sim', '真机闭环', '部署、调参、故障恢复', '⎈', 'locked', 'control', 4, 0, '解锁真机验证'),
+        node('ai-data', 'root', '数据工程', '采集、清洗、标注', '▦', 'done', 'ai', 2, 0, '+1 数据质量'),
+        node('ai-train', 'ai-data', '模型训练', '训练、评测、迭代', '◆', 'current', 'ai', 3, 0, '+1 模型能力'),
+        node('ai-agent', 'ai-train', '机器人 Agent', '规划、工具、记忆', '✹', 'locked', 'ai', 4, 0, '解锁智能体链路'),
+        node('deploy-web', 'root', 'Web 全栈', '前端、后端、数据库', '▣', 'done', 'deploy', 2, 0, '+1 工程闭环'),
+        node('deploy-cloud', 'deploy-web', '云端服务', 'CI/CD、Worker、监控', '☁', 'current', 'deploy', 3, 0, '+1 服务稳定性'),
+        node('deploy-product', 'deploy-cloud', '产品化交付', '账号、支付、后台', '◈', 'locked', 'deploy', 4, 0, '解锁产品闭环'),
+        node('biz-writing', 'root', '内容输出', '博客、教程、案例', '✎', 'done', 'business', 2, 0, '+1 表达力'),
+        node('biz-course', 'biz-writing', '课程体系', '知识地图与训练营', '♜', 'current', 'business', 3, 0, '+1 课程转化'),
+        node('biz-consult', 'biz-course', '咨询交付', '机器人知识付费', '₿', 'locked', 'business', 4, 0, '解锁商业案例')
       ]
+    };
+  }
+
+  function node(id, parent, title, subtitle, icon, state, branch, tier, slot, perk) {
+    return {
+      id,
+      parent,
+      title,
+      subtitle,
+      icon,
+      state,
+      branch,
+      tier,
+      slot,
+      perk,
+      link: '',
+      notes: ''
     };
   }
 
   function loadTree() {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
+      const stored = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
       if (!stored) return starterTree();
       const parsed = JSON.parse(stored);
-      if (!parsed || !Array.isArray(parsed.nodes) || !parsed.nodes.length) {
-        return starterTree();
-      }
+      if (!parsed || !Array.isArray(parsed.nodes) || !parsed.nodes.length) return starterTree();
       return normalizeTree(parsed);
     } catch (error) {
       console.warn('Skill tree data is invalid, using starter tree.', error);
@@ -146,51 +158,132 @@
   }
 
   function normalizeTree(data) {
-    const nodes = data.nodes.map((node, index) => ({
-      id: String(node.id || createId()),
-      parent: node.parent === undefined ? null : node.parent,
-      title: String(node.title || (index === 0 ? '原点' : '新技能')),
-      subtitle: String(node.subtitle || ''),
-      icon: String(node.icon || '✦').slice(0, 2),
-      state: stateLabels[node.state] ? node.state : 'current',
-      link: String(node.link || ''),
-      notes: String(node.notes || ''),
-      x: Number.isFinite(Number(node.x)) ? Number(node.x) : WORLD.width / 2,
-      y: Number.isFinite(Number(node.y)) ? Number(node.y) : WORLD.height / 2
-    }));
+    const branches = normalizeBranches(data.branches);
+    const tiers = normalizeTiers(data.tiers);
+    const branchIds = branches.map((branch) => branch.id);
+    const maxTier = tiers.length;
+    const legacyDepth = computeLegacyDepths(data.nodes || []);
 
-    if (!nodes.some((node) => node.id === 'root')) {
-      nodes[0].id = 'root';
-      nodes[0].parent = null;
-    }
-
-    nodes.forEach((node) => {
-      if (node.id === 'root') node.parent = null;
-      if (node.parent && !nodes.some((candidate) => candidate.id === node.parent)) {
-        node.parent = 'root';
-      }
-      node.x = clamp(node.x, 120, WORLD.width - 120);
-      node.y = clamp(node.y, 80, WORLD.height - 80);
+    const nodes = data.nodes.map((rawNode, index) => {
+      const id = String(rawNode.id || createId());
+      const branch = branchIds.includes(rawNode.branch)
+        ? rawNode.branch
+        : branchIds[index % branchIds.length];
+      const tier = clamp(Number(rawNode.tier || legacyDepth[id] || 1), 1, maxTier);
+      return {
+        id,
+        parent: rawNode.parent === undefined ? null : rawNode.parent,
+        title: String(rawNode.title || (index === 0 ? '基地入门' : '新技能')),
+        subtitle: String(rawNode.subtitle || ''),
+        icon: String(rawNode.icon || branches.find((item) => item.id === branch).icon || '◆').slice(0, 2),
+        state: stateLabels[rawNode.state] ? rawNode.state : 'current',
+        branch,
+        tier,
+        slot: Number.isFinite(Number(rawNode.slot)) ? Math.max(0, Number(rawNode.slot)) : 0,
+        perk: String(rawNode.perk || ''),
+        link: String(rawNode.link || ''),
+        notes: String(rawNode.notes || ''),
+        x: 0,
+        y: 0
+      };
     });
 
-    return {
-      version: 1,
+    if (!nodes.some((item) => item.id === 'root')) {
+      nodes[0].id = 'root';
+      nodes[0].parent = null;
+      nodes[0].state = 'master';
+    }
+
+    nodes.forEach((item) => {
+      if (item.id === 'root') item.parent = null;
+      if (item.parent && !nodes.some((candidate) => candidate.id === item.parent)) item.parent = 'root';
+      item.tier = clamp(item.tier, 1, maxTier);
+    });
+
+    const normalized = {
+      version: 2,
+      layout: 'oni-grid',
       selectedId: data.selectedId || 'root',
       view: {
         x: Number.isFinite(Number(data.view && data.view.x)) ? Number(data.view.x) : 0,
         y: Number.isFinite(Number(data.view && data.view.y)) ? Number(data.view.y) : 0,
-        scale: Number.isFinite(Number(data.view && data.view.scale)) ? clamp(Number(data.view.scale), 0.35, 1.65) : 0.8
+        scale: Number.isFinite(Number(data.view && data.view.scale)) ? clamp(Number(data.view.scale), 0.42, 1.45) : 0.78
       },
+      branches,
+      tiers,
       nodes
     };
+    compactSlots(normalized);
+    return normalized;
+  }
+
+  function normalizeBranches(input) {
+    const fallback = defaultBranches();
+    if (!Array.isArray(input) || !input.length) return fallback;
+    const used = new Set();
+    const branches = input.map((branch, index) => {
+      const fallbackBranch = fallback[index % fallback.length];
+      let id = String(branch.id || fallbackBranch.id || `branch-${index + 1}`).trim();
+      if (!id || used.has(id)) id = `branch-${index + 1}`;
+      used.add(id);
+      return {
+        id,
+        title: String(branch.title || fallbackBranch.title || `分支 ${index + 1}`),
+        icon: String(branch.icon || fallbackBranch.icon || '◆').slice(0, 2),
+        color: /^#[0-9a-f]{6}$/i.test(branch.color || '') ? branch.color : fallbackBranch.color
+      };
+    });
+    return branches.slice(0, 10);
+  }
+
+  function normalizeTiers(input) {
+    const fallback = defaultTiers();
+    if (!Array.isArray(input) || !input.length) return fallback;
+    return input.slice(0, 8).map((tier, index) => ({
+      level: index + 1,
+      title: String(tier.title || `Tier ${index + 1}`),
+      morale: String(tier.morale || `+${index}`)
+    }));
+  }
+
+  function computeLegacyDepths(nodes) {
+    const byId = new Map(nodes.map((item) => [String(item.id), item]));
+    const cache = {};
+    function depth(id, seen = new Set()) {
+      if (cache[id]) return cache[id];
+      const item = byId.get(id);
+      if (!item || !item.parent || seen.has(id)) return 1;
+      seen.add(id);
+      cache[id] = clamp(depth(String(item.parent), seen) + 1, 1, 6);
+      return cache[id];
+    }
+    nodes.forEach((item) => depth(String(item.id)));
+    return cache;
+  }
+
+  function compactSlots(targetTree = tree) {
+    targetTree.branches.forEach((branch) => {
+      for (let tier = 1; tier <= targetTree.tiers.length; tier += 1) {
+        targetTree.nodes
+          .filter((item) => item.branch === branch.id && item.tier === tier)
+          .sort((a, b) => Number(a.slot || 0) - Number(b.slot || 0) || a.title.localeCompare(b.title))
+          .forEach((item, index) => {
+            item.slot = index;
+          });
+      }
+    });
   }
 
   function getNode(id) {
-    return tree.nodes.find((node) => node.id === id);
+    return tree.nodes.find((item) => item.id === id);
   }
 
   function getChildren(parentId) {
-    return tree.nodes.filter((node) => node.parent === parentId);
+    return tree.nodes.filter((item) => item.parent === parentId);
+  }
+
+  function getBranch(id) {
+    return tree.branches.find((item) => item.id === id) || tree.branches[0];
   }
 
   function createId() {
@@ -232,26 +325,22 @@
   function rememberCloudConfig() {
     const endpoint = getCloudEndpoint();
     const token = getCloudToken();
-    if (endpoint) {
-      localStorage.setItem(CLOUD_ENDPOINT_KEY, endpoint);
-    } else {
-      localStorage.removeItem(CLOUD_ENDPOINT_KEY);
-    }
-    if (token) {
-      localStorage.setItem(CLOUD_TOKEN_KEY, token);
-    } else {
-      localStorage.removeItem(CLOUD_TOKEN_KEY);
-    }
+    if (endpoint) localStorage.setItem(CLOUD_ENDPOINT_KEY, endpoint);
+    else localStorage.removeItem(CLOUD_ENDPOINT_KEY);
+    if (token) localStorage.setItem(CLOUD_TOKEN_KEY, token);
+    else localStorage.removeItem(CLOUD_TOKEN_KEY);
     updateCloudBadge();
   }
 
   function initCloudControls() {
     if (!els.cloudEndpoint || !els.cloudToken) return;
-    const configuredEndpoint = normalizeEndpoint(CLOUD_CONFIG.endpoint);
+    const configuredEndpoint = normalizeEndpoint(cloudConfig.endpoint);
     const storedEndpoint = normalizeEndpoint(localStorage.getItem(CLOUD_ENDPOINT_KEY));
     const storedToken = localStorage.getItem(CLOUD_TOKEN_KEY) || '';
-    els.cloudEndpoint.value = storedEndpoint || configuredEndpoint || '';
+    const shouldUseConfigured = configuredEndpoint && (!storedEndpoint || storedEndpoint.includes('workers.dev'));
+    els.cloudEndpoint.value = shouldUseConfigured ? configuredEndpoint : (storedEndpoint || configuredEndpoint || '');
     els.cloudToken.value = storedToken;
+    if (shouldUseConfigured) localStorage.setItem(CLOUD_ENDPOINT_KEY, configuredEndpoint);
     updateCloudBadge();
   }
 
@@ -310,13 +399,10 @@
         return false;
       }
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
       const payload = await response.json();
-      const incomingTree = payload && payload.tree ? payload.tree : payload;
-      tree = normalizeTree(incomingTree);
+      tree = normalizeTree(payload && payload.tree ? payload.tree : payload);
       selectedId = tree.selectedId || 'root';
       render();
       saveTree();
@@ -371,9 +457,7 @@
         return;
       }
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
       const payload = await response.json().catch(() => null);
       if (payload && payload.tree) {
@@ -393,47 +477,91 @@
     }
   }
 
+  function buildLayout() {
+    compactSlots();
+    const branchHeights = {};
+    tree.branches.forEach((branch) => {
+      let maxSlot = 0;
+      tree.nodes
+        .filter((item) => item.branch === branch.id)
+        .forEach((item) => {
+          maxSlot = Math.max(maxSlot, Number(item.slot || 0));
+        });
+      branchHeights[branch.id] = Math.max(GRID.rowMinHeight, 118 + maxSlot * GRID.slotGap);
+    });
+
+    const branchTops = {};
+    let y = GRID.top;
+    tree.branches.forEach((branch) => {
+      branchTops[branch.id] = y;
+      y += branchHeights[branch.id];
+    });
+
+    const width = GRID.left + tree.tiers.length * GRID.colWidth + GRID.rightPad;
+    const height = y + GRID.bottomPad;
+    const layout = { width, height, branchTops, branchHeights };
+
+    tree.nodes.forEach((item) => {
+      const top = branchTops[item.branch] || GRID.top;
+      item.x = GRID.left + (item.tier - 1) * GRID.colWidth + GRID.colWidth / 2;
+      item.y = top + 64 + Number(item.slot || 0) * GRID.slotGap;
+    });
+
+    latestLayout = layout;
+    return layout;
+  }
+
   function render() {
     if (!getNode(selectedId)) selectedId = 'root';
     tree.selectedId = selectedId;
+    renderBranchOptions();
+    const layout = buildLayout();
+    setWorldSize(layout);
     renderLinks();
-    renderNodes();
+    renderNodes(layout);
     renderForm();
     applyView();
   }
 
+  function setWorldSize(layout) {
+    els.world.style.width = `${layout.width}px`;
+    els.world.style.height = `${layout.height}px`;
+    els.links.setAttribute('width', layout.width);
+    els.links.setAttribute('height', layout.height);
+    els.links.setAttribute('viewBox', `0 0 ${layout.width} ${layout.height}`);
+  }
+
+  function renderBranchOptions() {
+    const currentValue = els.branch.value;
+    els.branch.innerHTML = tree.branches
+      .map((branch) => `<option value="${escapeHtml(branch.id)}">${escapeHtml(branch.title)}</option>`)
+      .join('');
+    if (currentValue && tree.branches.some((branch) => branch.id === currentValue)) {
+      els.branch.value = currentValue;
+    }
+  }
+
   function renderLinks() {
     els.links.innerHTML = tree.nodes
-      .filter((node) => node.parent && getNode(node.parent))
-      .map((node) => {
-        const parent = getNode(node.parent);
-        const midX = (parent.x + node.x) / 2;
-        const d = `M ${parent.x} ${parent.y} C ${midX} ${parent.y}, ${midX} ${node.y}, ${node.x} ${node.y}`;
-        return `<path class="skill-link-path-shadow" d="${d}"></path><path class="skill-link-path" d="${d}"></path>`;
+      .filter((item) => item.parent && getNode(item.parent))
+      .map((item) => {
+        const parent = getNode(item.parent);
+        const color = getBranch(item.branch).color;
+        const startX = parent.x + GRID.nodeWidth / 2 - 8;
+        const startY = parent.y;
+        const endX = item.x - GRID.nodeWidth / 2 + 8;
+        const endY = item.y;
+        const elbow = Math.max(54, Math.abs(endX - startX) / 2);
+        const d = `M ${startX} ${startY} C ${startX + elbow} ${startY}, ${endX - elbow} ${endY}, ${endX} ${endY}`;
+        return `<path class="skill-link-path-shadow" d="${d}"></path><path class="skill-link-path ${item.state}" d="${d}" style="stroke:${escapeHtml(color)}"></path>`;
       })
       .join('');
   }
 
-  function renderNodes() {
-    els.nodes.innerHTML = tree.nodes.map((node) => {
-      const url = safeUrl(node.link);
-      return `
-        <div class="skill-node ${node.state} ${node.id === selectedId ? 'is-selected' : ''}" data-id="${escapeHtml(node.id)}" role="button" tabindex="0" style="left:${node.x}px;top:${node.y}px">
-          <span class="skill-node-emblem">${escapeHtml(node.icon || '✦')}</span>
-          <span class="skill-node-body">
-            <span class="skill-node-title">${escapeHtml(node.title)}</span>
-            <span class="skill-node-subtitle">${escapeHtml(node.subtitle || node.notes || '双击左侧面板编辑这个节点')}</span>
-            <span class="skill-node-meta">
-              <span class="skill-node-state">${stateLabels[node.state] || '修炼中'}</span>
-              ${url ? `<a class="skill-node-link" href="${escapeHtml(url)}" target="_blank" rel="noopener" title="打开链接"><i class="fas fa-external-link-alt"></i></a>` : ''}
-            </span>
-          </span>
-        </div>
-      `;
-    }).join('');
+  function renderNodes(layout) {
+    els.nodes.innerHTML = `${renderGridChrome(layout)}${tree.nodes.map(renderNode).join('')}`;
 
     els.nodes.querySelectorAll('.skill-node').forEach((nodeEl) => {
-      nodeEl.addEventListener('pointerdown', startNodeDrag);
       nodeEl.addEventListener('click', (event) => {
         const link = event.target.closest('a');
         if (link) return;
@@ -451,141 +579,198 @@
     });
   }
 
-  function renderForm() {
-    const node = getNode(selectedId);
-    if (!node) return;
+  function renderGridChrome(layout) {
+    const tiers = tree.tiers.map((tier, index) => {
+      const left = GRID.left + index * GRID.colWidth;
+      return `
+        <div class="skill-tier-label" style="left:${left}px;top:18px;width:${GRID.colWidth}px">
+          <span>${escapeHtml(tier.title)}</span>
+          <em>士气 ${escapeHtml(tier.morale)}</em>
+        </div>
+      `;
+    }).join('');
 
-    els.title.value = node.title;
-    els.subtitle.value = node.subtitle;
-    els.icon.value = node.icon;
-    els.state.value = node.state;
-    els.link.value = node.link;
-    els.notes.value = node.notes;
-    els.delete.disabled = node.id === 'root';
-    els.addSibling.disabled = node.id === 'root';
+    const cells = [];
+    tree.branches.forEach((branch) => {
+      const top = layout.branchTops[branch.id];
+      const height = layout.branchHeights[branch.id];
+      cells.push(`
+        <div class="skill-branch-label" style="left:18px;top:${top + 16}px;width:${GRID.left - 34}px;height:${height - 24}px;--branch-color:${escapeHtml(branch.color)}">
+          <span class="skill-branch-icon">${escapeHtml(branch.icon)}</span>
+          <span>${escapeHtml(branch.title)}</span>
+        </div>
+      `);
+      tree.tiers.forEach((tier, index) => {
+        const left = GRID.left + index * GRID.colWidth;
+        cells.push(`<div class="skill-grid-cell" style="left:${left}px;top:${top}px;width:${GRID.colWidth}px;height:${height}px"></div>`);
+      });
+    });
+
+    return `
+      <div class="skill-grid-backdrop" style="width:${layout.width}px;height:${layout.height}px"></div>
+      ${tiers}
+      ${cells.join('')}
+    `;
+  }
+
+  function renderNode(item) {
+    const branch = getBranch(item.branch);
+    const url = safeUrl(item.link);
+    const prereq = item.parent ? getNode(item.parent) : null;
+    return `
+      <div class="skill-node ${item.state} ${item.id === selectedId ? 'is-selected' : ''}" data-id="${escapeHtml(item.id)}" role="button" tabindex="0" style="left:${item.x}px;top:${item.y}px;--branch-color:${escapeHtml(branch.color)}">
+        <span class="skill-node-emblem">${escapeHtml(item.icon || branch.icon || '◆')}</span>
+        <span class="skill-node-body">
+          <span class="skill-node-title">${escapeHtml(item.title)}</span>
+          <span class="skill-node-subtitle">${escapeHtml(item.subtitle || item.notes || '点击左侧面板编辑')}</span>
+          <span class="skill-node-perk">${escapeHtml(item.perk || '未设置增益')}</span>
+          <span class="skill-node-meta">
+            <span class="skill-node-state">${stateLabels[item.state] || '可学习'}</span>
+            <span class="skill-node-prereq">${prereq ? `前置 ${escapeHtml(prereq.title)}` : '起点'}</span>
+            ${url ? `<a class="skill-node-link" href="${escapeHtml(url)}" target="_blank" rel="noopener" title="打开链接"><i class="fas fa-external-link-alt"></i></a>` : ''}
+          </span>
+        </span>
+      </div>
+    `;
+  }
+
+  function renderForm() {
+    const item = getNode(selectedId);
+    if (!item) return;
+    els.title.value = item.title;
+    els.subtitle.value = item.subtitle;
+    els.icon.value = item.icon;
+    els.state.value = item.state;
+    els.branch.value = item.branch;
+    els.tier.value = item.tier;
+    els.perk.value = item.perk;
+    els.link.value = item.link;
+    els.notes.value = item.notes;
+    els.delete.disabled = item.id === 'root';
+    els.addSibling.disabled = item.id === 'root';
   }
 
   function applyView() {
-    tree.view.scale = clamp(tree.view.scale, 0.35, 1.65);
+    tree.view.scale = clamp(tree.view.scale, 0.42, 1.45);
     els.world.style.transform = `translate(${tree.view.x}px, ${tree.view.y}px) scale(${tree.view.scale})`;
   }
 
   function updateSelectedFromForm() {
-    const node = getNode(selectedId);
-    if (!node) return;
-
-    node.title = els.title.value.trim() || '未命名技能';
-    node.subtitle = els.subtitle.value.trim();
-    node.icon = (els.icon.value.trim() || '✦').slice(0, 2);
-    node.state = els.state.value;
-    node.link = els.link.value.trim();
-    node.notes = els.notes.value.trim();
-    renderLinks();
-    renderNodes();
+    const item = getNode(selectedId);
+    if (!item) return;
+    item.title = els.title.value.trim() || '未命名技能';
+    item.subtitle = els.subtitle.value.trim();
+    item.icon = (els.icon.value.trim() || getBranch(item.branch).icon || '◆').slice(0, 2);
+    item.state = els.state.value;
+    item.branch = els.branch.value;
+    item.tier = clamp(Number(els.tier.value || 1), 1, tree.tiers.length);
+    item.perk = els.perk.value.trim();
+    item.link = els.link.value.trim();
+    item.notes = els.notes.value.trim();
+    compactSlots();
+    render();
     scheduleSave();
   }
 
   function addNode(parentId) {
     const parent = getNode(parentId) || getNode('root');
-    const siblingCount = getChildren(parent.id).length;
-    const angle = (Math.PI * 2 * siblingCount) / Math.max(5, siblingCount + 1) - Math.PI / 2;
-    const distance = parent.id === 'root' ? 360 : 260;
-    const node = {
+    const branch = parent.branch || tree.branches[0].id;
+    const tier = clamp(Number(parent.tier || 1) + 1, 1, tree.tiers.length);
+    const item = {
       id: createId(),
       parent: parent.id,
       title: '新技能',
       subtitle: '点击左侧编辑',
-      icon: '✦',
-      state: 'current',
+      icon: getBranch(branch).icon,
+      state: tier <= Number(parent.tier || 1) + 1 ? 'current' : 'locked',
+      branch,
+      tier,
+      slot: nextSlot(branch, tier),
+      perk: '+1 新能力',
       link: '',
       notes: '',
-      x: clamp(parent.x + Math.cos(angle) * distance, 140, WORLD.width - 140),
-      y: clamp(parent.y + Math.sin(angle) * distance, 110, WORLD.height - 110)
+      x: 0,
+      y: 0
     };
-    tree.nodes.push(node);
-    selectedId = node.id;
+    tree.nodes.push(item);
+    selectedId = item.id;
     render();
-    saveTree('已添加节点');
+    saveTree('已添加后置技能');
   }
 
   function addSibling() {
-    const node = getNode(selectedId);
-    if (!node || node.id === 'root') return;
-    addNode(node.parent || 'root');
+    const current = getNode(selectedId);
+    if (!current || current.id === 'root') return;
+    const item = {
+      id: createId(),
+      parent: current.parent || 'root',
+      title: '同列技能',
+      subtitle: '点击左侧编辑',
+      icon: current.icon,
+      state: 'current',
+      branch: current.branch,
+      tier: current.tier,
+      slot: nextSlot(current.branch, current.tier),
+      perk: '+1 分支能力',
+      link: '',
+      notes: '',
+      x: 0,
+      y: 0
+    };
+    tree.nodes.push(item);
+    selectedId = item.id;
+    render();
+    saveTree('已添加同列技能');
+  }
+
+  function nextSlot(branch, tier) {
+    const slots = tree.nodes
+      .filter((item) => item.branch === branch && Number(item.tier) === Number(tier))
+      .map((item) => Number(item.slot || 0));
+    return slots.length ? Math.max(...slots) + 1 : 0;
   }
 
   function deleteSelected() {
-    const node = getNode(selectedId);
-    if (!node || node.id === 'root') return;
-
-    const descendants = collectDescendants(node.id);
+    const item = getNode(selectedId);
+    if (!item || item.id === 'root') return;
+    const descendants = collectDescendants(item.id);
     const total = descendants.length + 1;
-    const ok = window.confirm(`确定删除「${node.title}」以及 ${total - 1} 个子节点吗？`);
+    const ok = window.confirm(`确定删除「${item.title}」以及 ${total - 1} 个后置技能吗？`);
     if (!ok) return;
 
-    const removeIds = new Set([node.id, ...descendants]);
-    selectedId = node.parent || 'root';
+    const removeIds = new Set([item.id, ...descendants]);
+    selectedId = item.parent || 'root';
     tree.nodes = tree.nodes.filter((candidate) => !removeIds.has(candidate.id));
+    compactSlots();
     render();
-    saveTree('已删除节点');
+    saveTree('已删除技能');
   }
 
   function collectDescendants(id) {
     const result = [];
-    const stack = getChildren(id).map((node) => node.id);
+    const stack = getChildren(id).map((item) => item.id);
     while (stack.length) {
       const childId = stack.pop();
       result.push(childId);
-      stack.push(...getChildren(childId).map((node) => node.id));
+      stack.push(...getChildren(childId).map((item) => item.id));
     }
     return result;
   }
 
   function autoLayout() {
-    const root = getNode('root');
-    if (!root) return;
-
-    root.x = WORLD.width / 2;
-    root.y = WORLD.height / 2;
-    layoutChildren(root.id, -Math.PI / 2, Math.PI * 2, 390, 0);
-    fitToTree();
+    compactSlots();
     render();
-    saveTree('已自动整理');
-  }
-
-  function layoutChildren(parentId, startAngle, sweep, radius, depth) {
-    const children = getChildren(parentId);
-    if (!children.length) return;
-
-    const parent = getNode(parentId);
-    const step = sweep / children.length;
-    children.forEach((child, index) => {
-      const angle = startAngle + step * (index + 0.5);
-      const distance = radius + depth * 86;
-      child.x = clamp(parent.x + Math.cos(angle) * distance, 150, WORLD.width - 150);
-      child.y = clamp(parent.y + Math.sin(angle) * distance, 120, WORLD.height - 120);
-      layoutChildren(child.id, angle - step * 0.42, step * 0.84, Math.max(220, radius * 0.72), depth + 1);
-    });
+    fitToTree();
+    saveTree('已整理为缺氧式网格');
   }
 
   function fitToTree() {
-    const bounds = tree.nodes.reduce((acc, node) => ({
-      minX: Math.min(acc.minX, node.x),
-      maxX: Math.max(acc.maxX, node.x),
-      minY: Math.min(acc.minY, node.y),
-      maxY: Math.max(acc.maxY, node.y)
-    }), { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity });
-
-    const width = Math.max(bounds.maxX - bounds.minX + NODE_SIZE.width + 180, 600);
-    const height = Math.max(bounds.maxY - bounds.minY + NODE_SIZE.height + 180, 420);
+    const layout = latestLayout || buildLayout();
     const viewport = els.viewport.getBoundingClientRect();
-    const scale = clamp(Math.min(viewport.width / width, viewport.height / height), 0.35, 1.2);
-    const centerX = (bounds.minX + bounds.maxX) / 2;
-    const centerY = (bounds.minY + bounds.maxY) / 2;
-
+    const scale = clamp(Math.min(viewport.width / layout.width, viewport.height / layout.height), 0.42, 1);
     tree.view.scale = scale;
-    tree.view.x = viewport.width / 2 - centerX * scale;
-    tree.view.y = viewport.height / 2 - centerY * scale;
+    tree.view.x = Math.max(12, (viewport.width - layout.width * scale) / 2);
+    tree.view.y = Math.max(12, (viewport.height - layout.height * scale) / 2);
     applyView();
     scheduleSave();
   }
@@ -634,8 +819,7 @@
     const reader = new FileReader();
     reader.onload = () => {
       try {
-        const imported = normalizeTree(JSON.parse(String(reader.result || '{}')));
-        tree = imported;
+        tree = normalizeTree(JSON.parse(String(reader.result || '{}')));
         selectedId = tree.selectedId || 'root';
         render();
         saveTree('已导入技能树');
@@ -648,77 +832,24 @@
   }
 
   function resetTree() {
-    const ok = window.confirm('确定恢复初始模板吗？当前浏览器里的技能树会被覆盖。');
+    const ok = window.confirm('确定恢复缺氧式模板吗？当前浏览器里的技能树会被覆盖。');
     if (!ok) return;
     tree = starterTree();
     selectedId = 'root';
     render();
     fitToTree();
-    saveTree('已恢复初始模板');
+    saveTree('已恢复缺氧式模板');
   }
 
   function zoom(delta) {
     const before = tree.view.scale;
-    tree.view.scale = clamp(tree.view.scale + delta, 0.35, 1.65);
+    tree.view.scale = clamp(tree.view.scale + delta, 0.42, 1.45);
     const rect = els.viewport.getBoundingClientRect();
     const cx = rect.width / 2;
     const cy = rect.height / 2;
     tree.view.x = cx - ((cx - tree.view.x) / before) * tree.view.scale;
     tree.view.y = cy - ((cy - tree.view.y) / before) * tree.view.scale;
     applyView();
-    scheduleSave();
-  }
-
-  function startNodeDrag(event) {
-    const nodeEl = event.currentTarget;
-    const link = event.target.closest('a');
-    if (link) return;
-
-    event.preventDefault();
-    selectedId = nodeEl.dataset.id;
-    const node = getNode(selectedId);
-    dragNode = {
-      id: selectedId,
-      pointerId: event.pointerId,
-      startX: event.clientX,
-      startY: event.clientY,
-      nodeX: node.x,
-      nodeY: node.y,
-      moved: false
-    };
-    nodeEl.setPointerCapture(event.pointerId);
-    nodeEl.classList.add('is-dragging');
-    renderForm();
-  }
-
-  function moveNode(event) {
-    if (!dragNode) return;
-    const node = getNode(dragNode.id);
-    if (!node) return;
-
-    const dx = (event.clientX - dragNode.startX) / tree.view.scale;
-    const dy = (event.clientY - dragNode.startY) / tree.view.scale;
-    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) dragNode.moved = true;
-    node.x = clamp(dragNode.nodeX + dx, 120, WORLD.width - 120);
-    node.y = clamp(dragNode.nodeY + dy, 80, WORLD.height - 80);
-    const nodeEl = els.nodes.querySelector(`[data-id="${CSS.escape(node.id)}"]`);
-    if (nodeEl) {
-      nodeEl.style.left = `${node.x}px`;
-      nodeEl.style.top = `${node.y}px`;
-    }
-    renderLinks();
-  }
-
-  function stopNodeDrag(event) {
-    if (!dragNode) return;
-    const nodeEl = els.nodes.querySelector(`[data-id="${CSS.escape(dragNode.id)}"]`);
-    if (nodeEl && nodeEl.hasPointerCapture(event.pointerId)) {
-      nodeEl.releasePointerCapture(event.pointerId);
-      nodeEl.classList.remove('is-dragging');
-    }
-    selectedId = dragNode.id;
-    dragNode = null;
-    render();
     scheduleSave();
   }
 
@@ -744,16 +875,14 @@
 
   function stopPan(event) {
     if (!panState) return;
-    if (els.viewport.hasPointerCapture(event.pointerId)) {
-      els.viewport.releasePointerCapture(event.pointerId);
-    }
+    if (els.viewport.hasPointerCapture(event.pointerId)) els.viewport.releasePointerCapture(event.pointerId);
     els.viewport.classList.remove('is-panning');
     panState = null;
     scheduleSave();
   }
 
   ['input', 'change'].forEach((eventName) => {
-    [els.title, els.subtitle, els.icon, els.state, els.link, els.notes].forEach((input) => {
+    [els.title, els.subtitle, els.icon, els.state, els.branch, els.tier, els.perk, els.link, els.notes].forEach((input) => {
       input.addEventListener(eventName, updateSelectedFromForm);
     });
   });
@@ -790,32 +919,21 @@
   els.reset.addEventListener('click', resetTree);
 
   els.viewport.addEventListener('pointerdown', startPan);
-  els.viewport.addEventListener('pointermove', (event) => {
-    moveNode(event);
-    movePan(event);
-  });
-  els.viewport.addEventListener('pointerup', (event) => {
-    stopNodeDrag(event);
-    stopPan(event);
-  });
-  els.viewport.addEventListener('pointercancel', (event) => {
-    stopNodeDrag(event);
-    stopPan(event);
-  });
+  els.viewport.addEventListener('pointermove', movePan);
+  els.viewport.addEventListener('pointerup', stopPan);
+  els.viewport.addEventListener('pointercancel', stopPan);
   els.viewport.addEventListener('wheel', (event) => {
     event.preventDefault();
     zoom(event.deltaY > 0 ? -0.08 : 0.08);
   }, { passive: false });
 
-  window.addEventListener('resize', () => {
-    applyView();
-  });
+  window.addEventListener('resize', applyView);
 
   initCloudControls();
   render();
   fitToTree();
   saveTree();
-  if (getCloudEndpoint() && CLOUD_CONFIG.autoLoad !== false) {
+  if (getCloudEndpoint() && cloudConfig.autoLoad !== false) {
     loadCloudTree({ silent: true });
   }
 })();
