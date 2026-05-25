@@ -242,7 +242,8 @@ aside:
   card_announcement:
     enable: true
     content: 
-      - 这只猪目前电子信息研二在读，论文已发，正在疯狂拓展横向，做产品，欢迎交流！
+      - 个人博客重启！感谢codeX！让我的博客重获新生！
+      - 目前已经是博一在读了hhh，机器人全栈方向欢迎交流~
   card_recent_post:
     enable: true
     limit: 5 # if set 0 will show all
