@@ -10,11 +10,11 @@ top_img: false
 <link rel="stylesheet" href="/sly_blog/css/skill-tree.css">
 
 <div id="skill-tree-app" class="skill-app" data-cloud-endpoint="https://sly-skill-tree-api-pages.pages.dev" data-cloud-autoload="true">
-  <section class="skill-shell" aria-label="缺氧式技能树编辑器">
+  <section class="skill-shell" aria-label="交叉领域技能树编辑器">
     <header class="skill-header">
       <div>
-        <p class="skill-kicker">Colony Skill Board</p>
-        <h1>缺氧式技能树</h1>
+        <p class="skill-kicker">Cross-Domain Skill Board</p>
+        <h1>领域交叉技能树</h1>
       </div>
       <div class="skill-actions" aria-label="技能树操作">
         <button id="skillSave" class="skill-button skill-button-primary" type="button" title="保存到当前浏览器">
@@ -41,13 +41,13 @@ top_img: false
         <div class="skill-panel-section">
           <p class="skill-panel-title">节点</p>
           <div class="skill-node-actions">
-            <button id="skillAddChild" class="skill-icon-button" type="button" title="添加后置技能">
+            <button id="skillAddChild" class="skill-icon-button" type="button" title="添加子节点">
               <i class="fas fa-plus"></i>
             </button>
-            <button id="skillAddSibling" class="skill-icon-button" type="button" title="添加同列技能">
+            <button id="skillAddSibling" class="skill-icon-button" type="button" title="添加同级节点">
               <i class="fas fa-code-branch"></i>
             </button>
-            <button id="skillDelete" class="skill-icon-button skill-danger" type="button" title="删除当前技能">
+            <button id="skillDelete" class="skill-icon-button skill-danger" type="button" title="删除当前节点">
               <i class="fas fa-trash"></i>
             </button>
           </div>
@@ -55,45 +55,44 @@ top_img: false
 
         <label class="skill-field">
           <span>名称</span>
-          <input id="skillTitle" type="text" maxlength="28" placeholder="比如：外骨骼操控">
+          <input id="skillTitle" type="text" maxlength="30" placeholder="比如：机器人系统集成">
         </label>
 
         <label class="skill-field">
           <span>描述</span>
-          <input id="skillSubtitle" type="text" maxlength="48" placeholder="比如：运动规划、控制、仿真">
+          <input id="skillSubtitle" type="text" maxlength="52" placeholder="比如：感知、控制、部署的汇聚能力">
         </label>
 
         <div class="skill-field-row">
           <label class="skill-field">
             <span>图标</span>
-            <input id="skillIcon" type="text" maxlength="2" placeholder="⚙">
+            <input id="skillIcon" type="text" maxlength="2" placeholder="✦">
           </label>
           <label class="skill-field">
             <span>状态</span>
             <select id="skillState">
-              <option value="current">可学习</option>
-              <option value="locked">锁定</option>
+              <option value="current">修炼中</option>
+              <option value="locked">未解锁</option>
               <option value="done">已掌握</option>
-              <option value="master">核心</option>
+              <option value="master">宗师</option>
             </select>
-          </label>
-        </div>
-
-        <div class="skill-field-row">
-          <label class="skill-field">
-            <span>分支</span>
-            <select id="skillBranch"></select>
-          </label>
-          <label class="skill-field">
-            <span>Tier</span>
-            <input id="skillTier" type="number" min="1" max="6" step="1">
           </label>
         </div>
 
         <label class="skill-field">
           <span>增益</span>
-          <input id="skillPerk" type="text" maxlength="42" placeholder="+1 研究效率 / 解锁某能力">
+          <input id="skillPerk" type="text" maxlength="44" placeholder="+1 工程闭环 / 解锁系统项目">
         </label>
+
+        <div class="skill-field">
+          <span>所属领域</span>
+          <div id="skillDomainChoices" class="skill-choice-list"></div>
+        </div>
+
+        <div class="skill-field">
+          <span>前置技能</span>
+          <div id="skillPrereqChoices" class="skill-choice-list skill-choice-list-tall"></div>
+        </div>
 
         <label class="skill-field">
           <span>链接</span>
@@ -102,13 +101,13 @@ top_img: false
 
         <label class="skill-field">
           <span>备注</span>
-          <textarea id="skillNotes" rows="4" maxlength="300" placeholder="写学习路线、资源、实践项目"></textarea>
+          <textarea id="skillNotes" rows="4" maxlength="320" placeholder="写学习路线、资源、实践项目"></textarea>
         </label>
 
         <div class="skill-panel-section">
           <p class="skill-panel-title">视图</p>
           <div class="skill-node-actions">
-            <button id="skillLayout" class="skill-icon-button" type="button" title="自动整理缺氧式网格">
+            <button id="skillLayout" class="skill-icon-button" type="button" title="自动整理自由图">
               <i class="fas fa-magic"></i>
             </button>
             <button id="skillFit" class="skill-icon-button" type="button" title="居中显示">
@@ -124,7 +123,7 @@ top_img: false
         </div>
 
         <button id="skillReset" class="skill-button skill-button-wide" type="button">
-          <i class="fas fa-undo"></i><span>恢复缺氧式模板</span>
+          <i class="fas fa-undo"></i><span>恢复交叉技能树模板</span>
         </button>
 
         <div class="skill-cloud-card">
@@ -149,11 +148,11 @@ top_img: false
       <main class="skill-canvas" aria-label="技能树画布">
         <div class="skill-canvas-toolbar">
           <span id="skillStatus">已自动保存</span>
-          <span>拖动画布移动，点击技能卡编辑，添加按钮会自动生成依赖</span>
+          <span>节点可自由拖动，一个节点可勾选多个前置技能与多个领域</span>
         </div>
         <div id="skillViewport" class="skill-viewport">
           <div id="skillWorld" class="skill-world">
-            <svg id="skillLinks" class="skill-links" aria-hidden="true"></svg>
+            <svg id="skillLinks" class="skill-links" width="3600" height="2400" viewBox="0 0 3600 2400" aria-hidden="true"></svg>
             <div id="skillNodes" class="skill-nodes"></div>
           </div>
         </div>
