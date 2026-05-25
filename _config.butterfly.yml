@@ -34,8 +34,8 @@ code_word_wrap: false
 # formal:
 #   icon: link || the description || color
 social:
-  fab fa-qq: /qq || QQ || '#24292e'
-  fab fa-weixin: mailto:sly3601@163.com || sly3601@163.com || '#4a7dbe'
+  fab fa-weixin: weixin:// || yzzaoaoao（机器人知识付费请咨询） || '#07c160'
+  fas fa-envelope: mailto:sly3601@163.com || sly3601@163.com || '#4a7dbe'
   fab fa-bilibili: https://space.bilibili.com/31092567 || bilibili || '#f879d2'
   fab fa-github: https://github.com/sly3601 || Github || '#24292e'
   
