@@ -1,0 +1,66 @@
+# Butterfly theme overrides.
+# Full defaults live in node_modules/hexo-theme-butterfly/_config.yml.
+
+nav:
+  logo:
+  display_title: true
+  display_post_title: true
+  fixed: false
+
+menu:
+  首页: / || fas fa-home
+  归档: /archives/ || fas fa-archive
+  分类: /categories/ || fas fa-folder-open
+  标签: /tags/ || fas fa-tags
+  关于: /about/ || fas fa-user
+
+social:
+  fab fa-github: https://github.com/sly3601 || GitHub || '#24292e'
+
+avatar:
+  img: /img/butterfly-icon.png
+  effect: false
+
+code_blocks:
+  theme: light
+  copy: true
+  language: true
+  shrink: false
+
+subtitle:
+  enable: true
+  effect: true
+  source: false
+  sub:
+    - 记录技术、生活和思考
+    - 慢慢写，持续更新
+
+index_layout: 3
+
+post_meta:
+  page:
+    date_type: created
+    date_format: date
+    categories: true
+    tags: false
+    label: true
+  post:
+    position: left
+    date_type: both
+    date_format: date
+    categories: true
+    tags: true
+    label: true
+
+toc:
+  post: true
+  page: false
+  number: true
+  expand: false
+  scroll_percent: true
+
+footer:
+  owner:
+    enable: true
+    since: 2026
+  copyright: true
