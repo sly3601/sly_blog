@@ -237,13 +237,13 @@ aside:
     button:
       enable: true
       icon: fab fa-github
-      text: 原始人正在努力把github用起来~
+      text: github东西不多，正在努力中...
       link: https://github.com/sly3601
   card_announcement:
     enable: true
     content: 
-      - 个人博客重启！感谢codeX！让我的博客重获新生！
-      - 目前已经是博一在读了hhh，机器人全栈方向欢迎交流~
+      - 个人博客重启！感谢codeX！让我的博客重获新生！\
+        目前已经是博一在读了hhh，机器人全栈方向欢迎交流~
   card_recent_post:
     enable: true
     limit: 5 # if set 0 will show all
