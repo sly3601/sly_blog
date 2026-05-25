@@ -9,7 +9,7 @@ top_img: false
 {% raw %}
 <link rel="stylesheet" href="/sly_blog/css/skill-tree.css">
 
-<div id="skill-tree-app" class="skill-app" data-cloud-endpoint="" data-cloud-autoload="true">
+<div id="skill-tree-app" class="skill-app" data-cloud-endpoint="https://sly-skill-tree-api-pages.pages.dev" data-cloud-autoload="true">
   <section class="skill-shell" aria-label="技能树编辑器">
     <header class="skill-header">
       <div>

@@ -34,4 +34,6 @@ After deployment, set the endpoint to the Worker origin, for example:
 https://sly-skill-tree-api.<your-subdomain>.workers.dev
 ```
 
+If `workers.dev` is unstable on the current network, use the Pages Functions deployment in `workers/skill-tree-pages` instead.
+
 The admin token is never committed to GitHub. It lives in Cloudflare Secret storage and is only typed into your own browser when saving.

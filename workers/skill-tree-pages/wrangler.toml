@@ -1,12 +1,10 @@
-name = "sly-skill-tree-api"
-main = "worker.js"
+name = "sly-skill-tree-api-pages"
+pages_build_output_dir = "./dist"
 compatibility_date = "2026-05-25"
-workers_dev = true
-preview_urls = true
 
 [[kv_namespaces]]
 binding = "SKILL_TREE_KV"
-id = "replace_with_your_kv_namespace_id"
+id = "05dd298085384c268dfb9407e7fce1e9"
 
 [vars]
 ALLOWED_ORIGINS = "https://sly3601.github.io,http://localhost:4002,http://localhost:4003"

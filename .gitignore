@@ -9,3 +9,4 @@ Thumbs.db
 .wrangler/
 workers/**/wrangler.toml
 !workers/**/wrangler.toml.example
+!workers/skill-tree-pages/wrangler.toml
