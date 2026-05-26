@@ -1085,6 +1085,7 @@ inject:
     - <script defer src="/sly_blog/js/cursor.js"></script>
     - <script defer src="https://npm.elemecdn.com/jquery@latest/dist/jquery.min.js"></script>
     - <script defer data-pjax src="/sly_blog/js/cat.js"></script>
+    - <script defer data-pjax src="/sly_blog/js/github-contrib.js"></script>
 
     # aplayer音乐
 

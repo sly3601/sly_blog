@@ -19,6 +19,10 @@ export default {
       return json({ ok: true, service: 'skill-tree-api' }, request, env);
     }
 
+    if (url.pathname === '/github-contributions' || url.pathname === '/github-contributions.svg') {
+      return githubContributionsSvg(request, env, url);
+    }
+
     if (url.pathname !== '/skill-tree') {
       return json({ ok: false, error: 'NOT_FOUND' }, request, env, 404);
     }
@@ -92,6 +96,159 @@ async function readJsonBody(request) {
   } catch (error) {
     throw new Error('INVALID_JSON');
   }
+}
+
+async function githubContributionsSvg(request, env, url) {
+  const username = sanitizeGithubUser(url.searchParams.get('user') || 'sly3601');
+  const color = sanitizeHexColor(url.searchParams.get('color') || 'ffc1da');
+
+  try {
+    const response = await fetch(`https://github.com/users/${username}/contributions`, {
+      headers: {
+        accept: 'text/html',
+        'user-agent': 'sly-blog-contribution-widget'
+      }
+    });
+    if (!response.ok) throw new Error(`GitHub ${response.status}`);
+    const html = await response.text();
+    const days = parseContributionDays(html);
+    if (!days.length) throw new Error('NO_CONTRIBUTION_DAYS');
+    const total = parseContributionTotal(html);
+    return svgResponse(renderContributionSvg({ username, color, days, total }), request, env, 600);
+  } catch (error) {
+    return svgResponse(renderContributionFallback(username), request, env, 60);
+  }
+}
+
+function parseContributionDays(html) {
+  const tags = html.match(/<td\b[^>]*ContributionCalendar-day[^>]*>/g) || [];
+  return tags.map((tag, index) => {
+    const date = readAttr(tag, 'data-date');
+    const id = readAttr(tag, 'id');
+    const idMatch = id.match(/contribution-day-component-(\d+)-(\d+)/);
+    return {
+      date,
+      level: clampNumber(readAttr(tag, 'data-level'), 0, 4, 0),
+      row: idMatch ? Number(idMatch[1]) : index % 7,
+      col: idMatch ? Number(idMatch[2]) : Math.floor(index / 7)
+    };
+  }).filter((day) => day.date);
+}
+
+function parseContributionTotal(html) {
+  const heading = /id="js-contribution-activity-description"[^>]*>([\s\S]*?)<\/h2>/.exec(html);
+  const text = (heading ? heading[1] : html).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+  const match = text.match(/([\d,]+)\s+contributions/i);
+  return match ? match[1] : '';
+}
+
+function renderContributionSvg({ username, color, days, total }) {
+  const cell = 10;
+  const gap = 3;
+  const step = cell + gap;
+  const left = 30;
+  const top = 24;
+  const maxCol = Math.max(...days.map((day) => day.col), 52);
+  const width = left + (maxCol + 1) * step + 14;
+  const height = 124;
+  const colors = buildPinkPalette(color);
+  const monthLabels = buildMonthLabels(days);
+  const rowLabels = [
+    { row: 1, text: 'Mon' },
+    { row: 3, text: 'Wed' },
+    { row: 5, text: 'Fri' }
+  ];
+
+  const rects = days.map((day) => {
+    const x = left + day.col * step;
+    const y = top + day.row * step;
+    const fill = colors[day.level] || colors[0];
+    return `<rect x="${x}" y="${y}" width="${cell}" height="${cell}" rx="2" fill="${fill}"><title>${escapeXml(day.date)}: level ${day.level}</title></rect>`;
+  }).join('');
+
+  const months = monthLabels.map((label) =>
+    `<text x="${left + label.col * step}" y="12" class="month">${escapeXml(label.text)}</text>`
+  ).join('');
+  const rows = rowLabels.map((label) =>
+    `<text x="0" y="${top + label.row * step + 9}" class="label">${label.text}</text>`
+  ).join('');
+  const totalText = total ? `${escapeXml(total)} contributions in the last year` : `GitHub contributions`;
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeXml(username)} GitHub contribution calendar">
+  <style>
+    text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .month, .label { fill: #9b7284; font-size: 10px; }
+    .summary { fill: #8f5570; font-size: 11px; font-weight: 700; }
+  </style>
+  <rect width="100%" height="100%" rx="10" fill="#fffafb"/>
+  ${months}
+  ${rows}
+  ${rects}
+  <text x="${left}" y="116" class="summary">${totalText}</text>
+</svg>`;
+}
+
+function buildMonthLabels(days) {
+  const rowZero = days.filter((day) => day.row === 0).sort((a, b) => a.col - b.col);
+  const labels = [];
+  let lastMonth = '';
+  rowZero.forEach((day) => {
+    const date = new Date(`${day.date}T00:00:00Z`);
+    const month = `${date.getUTCMonth() + 1}月`;
+    if (month !== lastMonth) {
+      labels.push({ col: day.col, text: month });
+      lastMonth = month;
+    }
+  });
+  return labels;
+}
+
+function buildPinkPalette(hex) {
+  const base = `#${hex}`;
+  return ['#f5edf2', '#ffe5ef', base, '#ff91bd', '#d95d97'];
+}
+
+function renderContributionFallback(username) {
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="700" height="124" viewBox="0 0 700 124" role="img" aria-label="GitHub contribution calendar unavailable">
+  <rect width="100%" height="100%" rx="10" fill="#fffafb"/>
+  <text x="24" y="56" fill="#8f5570" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="14" font-weight="700">暂时没有读到 @${escapeXml(username)} 的 GitHub 贡献图</text>
+  <text x="24" y="80" fill="#9b7284" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="12">刷新后会自动重试。</text>
+</svg>`;
+}
+
+function svgResponse(svg, request, env, maxAge) {
+  return new Response(svg, {
+    headers: {
+      ...corsHeaders(request, env),
+      'content-type': 'image/svg+xml; charset=utf-8',
+      'cache-control': `public, max-age=${maxAge}, s-maxage=${maxAge}`
+    }
+  });
+}
+
+function sanitizeGithubUser(value) {
+  const username = String(value || '').trim();
+  return /^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,37}[a-zA-Z0-9])?$/.test(username) ? username : 'sly3601';
+}
+
+function sanitizeHexColor(value) {
+  const color = String(value || '').trim().replace(/^#/, '');
+  return /^[0-9a-f]{6}$/i.test(color) ? color.toLowerCase() : 'ffc1da';
+}
+
+function readAttr(tag, name) {
+  const match = new RegExp(`${name}="([^"]*)"`).exec(tag);
+  return match ? match[1] : '';
+}
+
+function escapeXml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 function defaultDomains() {
