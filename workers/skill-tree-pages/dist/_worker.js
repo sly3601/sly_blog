@@ -6,6 +6,7 @@ const DEFAULT_GITHUB_BRANCH = 'main';
 const POSTS_DIR = 'source/_posts';
 const DEFAULT_ALLOWED_ORIGINS = [
   'https://sly3601.github.io',
+  'https://sly-blog.pages.dev',
   'http://localhost:4000',
   'http://localhost:4002',
   'http://localhost:4003',
@@ -567,7 +568,7 @@ function json(payload, request, env, status = 200) {
 
 function corsHeaders(request, env) {
   const origin = request.headers.get('Origin');
-  const allowedOrigins = String(env.ALLOWED_ORIGINS || DEFAULT_ALLOWED_ORIGINS.join(','))
+  const allowedOrigins = `${DEFAULT_ALLOWED_ORIGINS.join(',')},${env.ALLOWED_ORIGINS || ''}`
     .split(',')
     .map((item) => item.trim())
     .filter(Boolean);
