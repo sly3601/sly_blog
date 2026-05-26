@@ -456,9 +456,26 @@
     display: none;
   }
   
-  /* 代码框主题 */
-  #article-container figure.highlight {
-    border-radius: 10px;
+  /* Code block polish */
+  #article-container figure.highlight,
+  #article-container > pre,
+  #article-container .highlight-wrap {
+    overflow: hidden;
+    border: 1px solid rgba(126, 146, 176, 0.22);
+    border-radius: 12px;
+    box-shadow: 0 14px 34px rgba(25, 35, 54, 0.12);
+  }
+
+  #article-container figure.highlight table,
+  #article-container figure.highlight pre,
+  #article-container figure.highlight .code pre,
+  #article-container figure.highlight .gutter pre {
+    border-radius: 0;
+  }
+
+  #article-container code:not(pre code) {
+    padding: 0.12em 0.36em;
+    border-radius: 6px;
   }
 
 
