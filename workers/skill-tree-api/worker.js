@@ -206,7 +206,7 @@ function buildMonthLabels(days) {
 
 function buildPinkPalette(hex) {
   const base = `#${hex}`;
-  return ['#f5edf2', '#ffe5ef', base, '#ff91bd', '#d95d97'];
+  return ['#f4e7ee', '#ffd2e4', base, '#f574ad', '#c93f80'];
 }
 
 function renderContributionFallback(username) {

@@ -172,24 +172,6 @@
     height: auto;
   }
 
-  .github-contrib-foot {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 12px;
-  }
-
-  .github-contrib-foot span {
-    display: inline-flex;
-    align-items: center;
-    min-height: 24px;
-    padding: 0 9px;
-    border-radius: 999px;
-    background: rgba(255, 193, 218, 0.22);
-    color: #9d3f70;
-    font-size: 0.74rem;
-    font-weight: 800;
-  }
   
   /* 首页侧栏卡片 */
   #aside-content .card-widget {
@@ -237,8 +219,7 @@
     color: #ffe1ec;
   }
 
-  [data-theme="dark"] .github-contrib-link,
-  [data-theme="dark"] .github-contrib-foot span {
+  [data-theme="dark"] .github-contrib-link {
     background: rgba(255, 143, 190, 0.12);
     color: #ffb5d0;
   }

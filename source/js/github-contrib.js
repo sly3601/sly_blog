@@ -21,19 +21,15 @@
     card.innerHTML = `
       <div class="github-contrib-head">
         <div>
-          <p class="github-contrib-kicker">GitHub Sync</p>
-          <h2>最近一年贡献图</h2>
+          <p class="github-contrib-kicker">GitHub</p>
+          <h2>肝度图</h2>
         </div>
         <a class="github-contrib-link" href="https://github.com/${USERNAME}" target="_blank" rel="noopener">
           <i class="fab fa-github"></i><span>@${USERNAME}</span>
         </a>
       </div>
-      <div class="github-contrib-chart" role="img" aria-label="${USERNAME} 的 GitHub 最近一年贡献图">
-        <img src="${chartUrl()}" alt="${USERNAME} 的 GitHub 最近一年贡献图" loading="lazy">
-      </div>
-      <div class="github-contrib-foot">
-        <span>淡粉色主题</span>
-        <span>自动同步公开贡献</span>
+      <div class="github-contrib-chart" role="img" aria-label="${USERNAME} 的 GitHub 肝度图">
+        <img src="${chartUrl()}" alt="${USERNAME} 的 GitHub 肝度图" loading="lazy">
       </div>
     `;
 
