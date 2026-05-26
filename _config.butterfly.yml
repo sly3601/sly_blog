@@ -15,6 +15,7 @@ menu:
   标签: /tags/ || fas fa-tags
   分类: /categories/ || fas fa-folder-open
   技能树: /skill-tree/ || fas fa-sitemap
+  写文章: /write/ || fas fa-pen-nib
   # List||fas fa-list:
   #   Music: /music/ || fas fa-music
   #   Movie: /movies/ || fas fa-video

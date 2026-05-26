@@ -1,10 +1,15 @@
 const TREE_KEY = 'skill-tree:current';
-const MAX_BODY_BYTES = 256 * 1024;
+const MAX_BODY_BYTES = 1024 * 1024;
+const DEFAULT_GITHUB_OWNER = 'sly3601';
+const DEFAULT_GITHUB_REPO = 'sly_blog';
+const DEFAULT_GITHUB_BRANCH = 'main';
+const POSTS_DIR = 'source/_posts';
 const DEFAULT_ALLOWED_ORIGINS = [
   'https://sly3601.github.io',
   'http://localhost:4000',
   'http://localhost:4002',
-  'http://localhost:4003'
+  'http://localhost:4003',
+  'http://127.0.0.1:4012'
 ];
 
 export default {
@@ -21,6 +26,10 @@ export default {
 
     if (url.pathname === '/github-contributions' || url.pathname === '/github-contributions.svg') {
       return githubContributionsSvg(request, env, url);
+    }
+
+    if (url.pathname === '/blog-posts') {
+      return blogPosts(request, env);
     }
 
     if (url.pathname !== '/skill-tree') {
@@ -96,6 +105,195 @@ async function readJsonBody(request) {
   } catch (error) {
     throw new Error('INVALID_JSON');
   }
+}
+
+async function blogPosts(request, env) {
+  if (request.method === 'GET') {
+    return json({
+      ok: true,
+      service: 'blog-posts',
+      owner: env.GITHUB_OWNER || DEFAULT_GITHUB_OWNER,
+      repo: env.GITHUB_REPO || DEFAULT_GITHUB_REPO,
+      branch: env.GITHUB_BRANCH || DEFAULT_GITHUB_BRANCH,
+      path: POSTS_DIR
+    }, request, env);
+  }
+
+  if (request.method !== 'POST') {
+    return json({ ok: false, error: 'METHOD_NOT_ALLOWED' }, request, env, 405);
+  }
+
+  const authResult = authorize(request, env);
+  if (!authResult.ok) {
+    return json({ ok: false, error: authResult.error }, request, env, authResult.status);
+  }
+
+  if (!String(env.GITHUB_TOKEN || '').trim()) {
+    return json({ ok: false, error: 'GITHUB_TOKEN_NOT_CONFIGURED' }, request, env, 500);
+  }
+
+  let post;
+  try {
+    post = normalizePost(await readJsonBody(request));
+  } catch (error) {
+    return json({ ok: false, error: error.message || 'INVALID_REQUEST' }, request, env, 400);
+  }
+
+  try {
+    const result = await savePostToGithub(post, env);
+    return json({ ok: true, ...result }, request, env);
+  } catch (error) {
+    const status = error.status || 500;
+    return json({ ok: false, error: error.message || 'GITHUB_WRITE_FAILED' }, request, env, status);
+  }
+}
+
+function normalizePost(input) {
+  const title = trimText(input && input.title, 120);
+  if (!title) throw new Error('TITLE_REQUIRED');
+
+  const markdown = String((input && input.markdown) || '').trim();
+  if (!markdown) throw new Error('BODY_REQUIRED');
+
+  const tags = Array.isArray(input.tags)
+    ? input.tags.map((tag) => trimText(tag, 50)).filter(Boolean).slice(0, 20)
+    : [];
+  const category = trimText(input.category, 50) || '日记';
+  const filename = `${sanitizeFilename(input.slug || title)}.md`;
+  const date = sanitizeDate(input.date) || formatDate(new Date());
+  const description = trimText(input.description, 220);
+  const cover = trimText(input.cover, 500);
+  const content = buildPostMarkdown({
+    title,
+    date,
+    updated: formatDate(new Date()),
+    category,
+    tags,
+    cover,
+    description,
+    markdown
+  });
+
+  return {
+    filename,
+    path: `${POSTS_DIR}/${filename}`,
+    content,
+    title,
+    overwrite: Boolean(input.overwrite)
+  };
+}
+
+function buildPostMarkdown(post) {
+  const lines = [
+    '---',
+    `title: ${yamlString(post.title)}`,
+    `date: ${yamlString(post.date)}`,
+    `updated: ${yamlString(post.updated)}`,
+    'categories:',
+    `  - ${yamlString(post.category)}`
+  ];
+
+  if (post.tags.length) {
+    lines.push('tags:', ...post.tags.map((tag) => `  - ${yamlString(tag)}`));
+  }
+  if (post.cover) lines.push(`cover: ${yamlString(post.cover)}`);
+  if (post.description) lines.push(`description: ${yamlString(post.description)}`);
+  lines.push('---', '', post.markdown.trim(), '');
+  return lines.join('\n');
+}
+
+async function savePostToGithub(post, env) {
+  const owner = trimText(env.GITHUB_OWNER, 80) || DEFAULT_GITHUB_OWNER;
+  const repo = trimText(env.GITHUB_REPO, 80) || DEFAULT_GITHUB_REPO;
+  const branch = trimText(env.GITHUB_BRANCH, 80) || DEFAULT_GITHUB_BRANCH;
+  const encodedPath = post.path.split('/').map(encodeURIComponent).join('/');
+  const endpoint = `https://api.github.com/repos/${owner}/${repo}/contents/${encodedPath}`;
+  const headers = githubHeaders(env);
+
+  let sha = '';
+  const existing = await fetch(`${endpoint}?ref=${encodeURIComponent(branch)}`, { headers });
+  if (existing.ok) {
+    const data = await existing.json();
+    sha = data.sha || '';
+    if (!post.overwrite) throw httpError('FILE_EXISTS', 409);
+  } else if (existing.status !== 404) {
+    throw httpError('GITHUB_READ_FAILED', existing.status);
+  }
+
+  const body = {
+    message: `Publish post: ${post.title}`,
+    content: base64FromUtf8(post.content),
+    branch
+  };
+  if (sha) body.sha = sha;
+
+  const response = await fetch(endpoint, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify(body)
+  });
+
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw httpError(result.message || 'GITHUB_WRITE_FAILED', response.status);
+  }
+
+  return {
+    path: post.path,
+    branch,
+    htmlUrl: result.content && result.content.html_url,
+    commitUrl: result.commit && result.commit.html_url
+  };
+}
+
+function githubHeaders(env) {
+  return {
+    accept: 'application/vnd.github+json',
+    authorization: `Bearer ${String(env.GITHUB_TOKEN || '').trim()}`,
+    'content-type': 'application/json',
+    'user-agent': 'sly-blog-writer',
+    'x-github-api-version': '2022-11-28'
+  };
+}
+
+function base64FromUtf8(value) {
+  const bytes = new TextEncoder().encode(value);
+  let binary = '';
+  for (let index = 0; index < bytes.length; index += 0x8000) {
+    const chunk = bytes.subarray(index, index + 0x8000);
+    binary += String.fromCharCode(...chunk);
+  }
+  return btoa(binary);
+}
+
+function sanitizeFilename(value) {
+  const cleaned = String(value || '')
+    .trim()
+    .replace(/[\\/:*?"<>|#%{}^~[\]`;]+/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .slice(0, 90);
+  return cleaned || `post-${Date.now()}`;
+}
+
+function sanitizeDate(value) {
+  const text = trimText(value, 30);
+  return /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(text) ? text : '';
+}
+
+function formatDate(date) {
+  const pad = (value) => String(value).padStart(2, '0');
+  return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())} ${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}:${pad(date.getUTCSeconds())}`;
+}
+
+function yamlString(value) {
+  return JSON.stringify(String(value || ''));
+}
+
+function httpError(message, status) {
+  const error = new Error(message);
+  error.status = status;
+  return error;
 }
 
 async function githubContributionsSvg(request, env, url) {

@@ -1,0 +1,325 @@
+.post-editor-app {
+  --write-bg: #f6f8fb;
+  --write-panel: rgba(255, 255, 255, 0.92);
+  --write-line: #e6eaf0;
+  --write-text: #202733;
+  --write-muted: #687386;
+  --write-blue: #3370ff;
+  --write-blue-deep: #245bdb;
+  --write-green: #2bb673;
+  --write-shadow: 0 18px 50px rgba(24, 37, 62, 0.12);
+  min-height: 100vh;
+  margin: -40px auto 0;
+  padding: 22px;
+  background:
+    radial-gradient(circle at 8% 0%, rgba(51, 112, 255, 0.12), transparent 30%),
+    linear-gradient(180deg, #fafdff 0%, var(--write-bg) 48%, #f7f4fb 100%);
+  color: var(--write-text);
+}
+
+.write-topbar {
+  position: sticky;
+  z-index: 10;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  max-width: 1440px;
+  margin: 0 auto 18px;
+  padding: 14px 18px;
+  border: 1px solid rgba(214, 222, 235, 0.86);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 10px 34px rgba(36, 60, 110, 0.08);
+  backdrop-filter: blur(14px);
+}
+
+.write-kicker {
+  margin: 0 0 4px;
+  color: var(--write-blue);
+  font-size: 0.75rem;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.write-topbar h1 {
+  margin: 0;
+  color: var(--write-text);
+  font-size: 1.45rem;
+  line-height: 1.18;
+}
+
+.write-actions,
+.write-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.write-button,
+.write-tool {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--write-line);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--write-text);
+  font-size: 0.86rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+}
+
+.write-button:hover,
+.write-tool:hover {
+  border-color: rgba(51, 112, 255, 0.5);
+  box-shadow: 0 8px 24px rgba(51, 112, 255, 0.12);
+  transform: translateY(-1px);
+}
+
+.write-button:disabled,
+.write-tool:disabled {
+  cursor: wait;
+  opacity: 0.58;
+  transform: none;
+}
+
+.write-button-primary {
+  border-color: transparent;
+  background: linear-gradient(180deg, #4b83ff, var(--write-blue-deep));
+  color: #fff;
+}
+
+.write-button-wide {
+  width: 100%;
+}
+
+.write-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 310px) minmax(0, 1fr);
+  gap: 18px;
+  max-width: 1440px;
+  margin: 0 auto;
+}
+
+.write-sidebar {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+}
+
+.write-panel,
+.write-editor-shell {
+  border: 1px solid rgba(214, 222, 235, 0.86);
+  border-radius: 8px;
+  background: var(--write-panel);
+  box-shadow: var(--write-shadow);
+}
+
+.write-panel {
+  padding: 16px;
+}
+
+.write-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  color: #293244;
+  font-size: 0.92rem;
+  font-weight: 900;
+}
+
+.write-panel-title i {
+  color: var(--write-blue);
+}
+
+.write-field {
+  display: grid;
+  gap: 7px;
+  margin-bottom: 12px;
+  color: var(--write-muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.write-field input,
+.write-field textarea {
+  width: 100%;
+  border: 1px solid var(--write-line);
+  border-radius: 6px;
+  background: #fbfcfe;
+  color: var(--write-text);
+  padding: 9px 10px;
+  outline: none;
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.write-field textarea {
+  resize: vertical;
+  min-height: 86px;
+}
+
+.write-field input:focus,
+.write-field textarea:focus {
+  border-color: rgba(51, 112, 255, 0.65);
+  box-shadow: 0 0 0 3px rgba(51, 112, 255, 0.12);
+}
+
+.write-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 12px;
+  color: var(--write-muted);
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.write-check input {
+  accent-color: var(--write-blue);
+}
+
+.write-editor-shell {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.write-toolbar {
+  min-height: 56px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--write-line);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.write-tool {
+  min-height: 32px;
+  padding: 0 10px;
+  background: #f9fbff;
+  font-size: 0.8rem;
+}
+
+.write-status {
+  margin-left: auto;
+  color: var(--write-muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.write-editor {
+  min-height: 720px;
+}
+
+.write-fallback-textarea {
+  width: 100%;
+  min-height: 720px;
+  border: none;
+  background: #fff;
+  color: var(--write-text);
+  padding: 24px;
+  outline: none;
+  font: 500 16px/1.7 ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  resize: vertical;
+}
+
+.write-editor .toastui-editor-defaultUI {
+  border: none;
+  font-family: inherit;
+}
+
+.write-editor .toastui-editor-defaultUI-toolbar {
+  border-bottom: 1px solid var(--write-line);
+  background: #fff;
+}
+
+.write-editor .toastui-editor-main,
+.write-editor .toastui-editor-contents {
+  font-size: 16px;
+}
+
+.write-editor .toastui-editor-contents mark {
+  padding: 0.08em 0.25em;
+  border-radius: 4px;
+  background: linear-gradient(180deg, rgba(255, 238, 140, 0.9), rgba(255, 221, 82, 0.7));
+}
+
+.write-toast {
+  position: fixed;
+  z-index: 10000;
+  right: 22px;
+  bottom: 24px;
+  max-width: min(420px, calc(100vw - 40px));
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: rgba(27, 38, 55, 0.94);
+  color: #fff;
+  box-shadow: 0 16px 42px rgba(20, 30, 48, 0.26);
+  opacity: 0;
+  transform: translateY(12px);
+  pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.write-toast.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+body.post-editor-page #page-header,
+body.post-editor-page #footer {
+  display: none;
+}
+
+body.post-editor-page #content-inner.layout {
+  display: block;
+  max-width: none;
+  padding: 0;
+}
+
+body.post-editor-page #page {
+  padding: 0;
+  background: transparent !important;
+  box-shadow: none;
+}
+
+@media (max-width: 980px) {
+  .post-editor-app {
+    padding: 14px;
+  }
+
+  .write-topbar {
+    position: static;
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .write-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .write-editor {
+    min-height: 620px;
+  }
+}
+
+@media (max-width: 640px) {
+  .write-actions .write-button,
+  .write-tool {
+    flex: 1 1 auto;
+  }
+
+  .write-status {
+    width: 100%;
+    margin-left: 0;
+  }
+}
