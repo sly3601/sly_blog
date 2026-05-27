@@ -14,6 +14,47 @@
     return `${API_BASE}?user=${USERNAME}&color=${PINK}&v=${refreshBucket}`;
   }
 
+  function fallbackChartUrl() {
+    return `https://ghchart.rshah.org/${PINK}/${USERNAME}`;
+  }
+
+  function localFallbackUrl() {
+    const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="700" height="124" viewBox="0 0 700 124" role="img" aria-label="GitHub contribution calendar unavailable">
+  <rect width="100%" height="100%" rx="10" fill="#fffafb"/>
+  <text x="24" y="56" fill="#8f5570" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="14" font-weight="700">暂时没有读到 @${USERNAME} 的 GitHub 贡献图</text>
+  <text x="24" y="80" fill="#9b7284" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="12">刷新后会自动重试。</text>
+</svg>`;
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  }
+
+  function guardImageLoading(image, card) {
+    let stage = 0;
+    let timer = window.setTimeout(useFallback, 4500);
+
+    function resetTimer() {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(useFallback, 4500);
+    }
+
+    function useFallback() {
+      card.classList.add('is-fallback');
+      if (stage === 0) {
+        stage = 1;
+        image.src = fallbackChartUrl();
+        resetTimer();
+        return;
+      }
+
+      stage = 2;
+      window.clearTimeout(timer);
+      image.src = localFallbackUrl();
+    }
+
+    image.addEventListener('load', () => window.clearTimeout(timer));
+    image.addEventListener('error', useFallback);
+  }
+
   function createCard() {
     const card = document.createElement('section');
     card.id = 'github-contrib-card';
@@ -34,10 +75,7 @@
     `;
 
     const image = card.querySelector('img');
-    image.addEventListener('error', () => {
-      image.src = `https://ghchart.rshah.org/${PINK}/${USERNAME}`;
-      card.classList.add('is-fallback');
-    }, { once: true });
+    guardImageLoading(image, card);
     return card;
   }
 

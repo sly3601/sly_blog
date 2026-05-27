@@ -848,12 +848,21 @@ async function githubContributionsSvg(request, env, url) {
   const color = sanitizeHexColor(url.searchParams.get('color') || 'ffc1da');
 
   try {
-    const response = await fetch(`https://github.com/users/${username}/contributions`, {
+    const result = await readContributionCalendarFromGithubApi(username, env);
+    if (result.days.length) {
+      return svgResponse(renderContributionSvg({ username, color, days: result.days, total: result.total }), request, env, 600);
+    }
+  } catch (error) {
+    // Fall through to the public HTML endpoint. It is less stable, but works without GraphQL.
+  }
+
+  try {
+    const response = await fetchWithTimeout(`https://github.com/users/${username}/contributions`, {
       headers: {
         accept: 'text/html',
         'user-agent': 'sly-blog-contribution-widget'
       }
-    });
+    }, 4500);
     if (!response.ok) throw new Error(`GitHub ${response.status}`);
     const html = await response.text();
     const days = parseContributionDays(html);
@@ -863,6 +872,69 @@ async function githubContributionsSvg(request, env, url) {
   } catch (error) {
     return svgResponse(renderContributionFallback(username), request, env, 60);
   }
+}
+
+async function readContributionCalendarFromGithubApi(username, env) {
+  const token = String(env.GITHUB_TOKEN || '').trim();
+  if (!token) throw new Error('GITHUB_TOKEN_NOT_CONFIGURED');
+
+  const query = `
+    query ContributionCalendar($login: String!) {
+      user(login: $login) {
+        contributionsCollection {
+          contributionCalendar {
+            totalContributions
+            weeks {
+              contributionDays {
+                date
+                contributionCount
+                contributionLevel
+                weekday
+              }
+            }
+          }
+        }
+      }
+    }
+  `;
+
+  const response = await fetchWithTimeout('https://api.github.com/graphql', {
+    method: 'POST',
+    headers: {
+      accept: 'application/vnd.github+json',
+      authorization: `Bearer ${token}`,
+      'content-type': 'application/json',
+      'user-agent': 'sly-blog-contribution-widget'
+    },
+    body: JSON.stringify({ query, variables: { login: username } })
+  }, 4500);
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok || data.errors) {
+    throw new Error('GITHUB_GRAPHQL_FAILED');
+  }
+
+  const calendar = data.data?.user?.contributionsCollection?.contributionCalendar;
+  const weeks = Array.isArray(calendar?.weeks) ? calendar.weeks : [];
+  const days = [];
+  weeks.forEach((week, col) => {
+    const contributionDays = Array.isArray(week.contributionDays) ? week.contributionDays : [];
+    contributionDays.forEach((day) => {
+      if (!day || !day.date) return;
+      days.push({
+        date: String(day.date),
+        count: Number(day.contributionCount || 0),
+        level: contributionLevelNumber(day.contributionLevel),
+        row: clampNumber(day.weekday, 0, 6, new Date(`${day.date}T00:00:00Z`).getUTCDay()),
+        col
+      });
+    });
+  });
+
+  return {
+    days,
+    total: String(calendar?.totalContributions || '')
+  };
 }
 
 function parseContributionDays(html) {
@@ -908,7 +980,8 @@ function renderContributionSvg({ username, color, days, total }) {
     const x = left + day.col * step;
     const y = top + day.row * step;
     const fill = colors[day.level] || colors[0];
-    return `<rect x="${x}" y="${y}" width="${cell}" height="${cell}" rx="2" fill="${fill}"><title>${escapeXml(day.date)}: level ${day.level}</title></rect>`;
+    const title = Number.isFinite(day.count) ? `${day.date}: ${day.count} contributions` : `${day.date}: level ${day.level}`;
+    return `<rect x="${x}" y="${y}" width="${cell}" height="${cell}" rx="2" fill="${fill}"><title>${escapeXml(title)}</title></rect>`;
   }).join('');
 
   const months = monthLabels.map((label) =>
@@ -954,6 +1027,17 @@ function buildPinkPalette(hex) {
   return ['#f4e7ee', '#ffd2e4', base, '#f574ad', '#c93f80'];
 }
 
+function contributionLevelNumber(level) {
+  const map = {
+    NONE: 0,
+    FIRST_QUARTILE: 1,
+    SECOND_QUARTILE: 2,
+    THIRD_QUARTILE: 3,
+    FOURTH_QUARTILE: 4
+  };
+  return map[String(level || '').toUpperCase()] ?? 0;
+}
+
 function renderContributionFallback(username) {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="700" height="124" viewBox="0 0 700 124" role="img" aria-label="GitHub contribution calendar unavailable">
@@ -961,6 +1045,19 @@ function renderContributionFallback(username) {
   <text x="24" y="56" fill="#8f5570" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="14" font-weight="700">暂时没有读到 @${escapeXml(username)} 的 GitHub 贡献图</text>
   <text x="24" y="80" fill="#9b7284" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="12">刷新后会自动重试。</text>
 </svg>`;
+}
+
+async function fetchWithTimeout(resource, options = {}, timeoutMs = 5000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort('TIMEOUT'), timeoutMs);
+  try {
+    return await fetch(resource, {
+      ...options,
+      signal: controller.signal
+    });
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function svgResponse(svg, request, env, maxAge) {
