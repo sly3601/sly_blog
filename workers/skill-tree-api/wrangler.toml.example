@@ -10,6 +10,10 @@ id = "replace_with_your_kv_namespace_id"
 
 [vars]
 ALLOWED_ORIGINS = "https://sly3601.github.io,http://localhost:4002,http://localhost:4003"
+# Configure S.EE as Cloudflare secret:
+# S_EE_API_KEY = "paste_in_dashboard_or_wrangler_secret"
+# Optional var:
+# S_EE_UPLOAD_PREFIX = "blog"
 # Optional Tencent Cloud COS image upload config for /write.
 # Keep TENCENT_COS_SECRET_ID and TENCENT_COS_SECRET_KEY as Cloudflare secrets.
 # TENCENT_COS_BUCKET = "sly-blog-1250000000"

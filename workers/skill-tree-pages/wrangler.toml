@@ -8,6 +8,10 @@ id = "05dd298085384c268dfb9407e7fce1e9"
 
 [vars]
 ALLOWED_ORIGINS = "https://sly3601.github.io,http://localhost:4002,http://localhost:4003"
+# Configure S.EE as Cloudflare Pages secret:
+# S_EE_API_KEY = "paste_in_dashboard_or_wrangler_secret"
+# Optional var:
+# S_EE_UPLOAD_PREFIX = "blog"
 # Configure these in Cloudflare Pages once COS is ready:
 # TENCENT_COS_BUCKET = "sly-blog-1250000000"
 # TENCENT_COS_REGION = "ap-guangzhou"

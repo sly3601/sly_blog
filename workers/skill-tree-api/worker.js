@@ -42,7 +42,7 @@ export default {
       return blogPosts(request, env);
     }
 
-    if (url.pathname === '/blog-images') {
+    if (url.pathname === '/blog-images' || url.pathname.startsWith('/blog-images/')) {
       return blogImages(request, env);
     }
 
@@ -122,11 +122,20 @@ async function readJsonBody(request, maxBytes = MAX_BODY_BYTES) {
 }
 
 async function blogImages(request, env) {
+  const see = seeConfig(env);
+  const r2 = r2Config(request, env);
+
   if (request.method === 'GET') {
+    if (urlImageKey(new URL(request.url))) {
+      return readImageFromR2(request, env);
+    }
+
+    const cos = cosConfig(env);
     return json({
       ok: true,
       service: 'blog-images',
-      configured: Boolean(cosConfig(env)),
+      configured: Boolean(see || r2 || cos),
+      storage: see ? 'see' : (r2 ? 'r2' : (cos ? 'cos' : '')),
       maxBytes: MAX_IMAGE_BYTES
     }, request, env);
   }
@@ -140,24 +149,28 @@ async function blogImages(request, env) {
     return json({ ok: false, error: authResult.error }, request, env, authResult.status);
   }
 
-  const config = cosConfig(env);
-  if (!config) {
-    return json({ ok: false, error: 'COS_NOT_CONFIGURED' }, request, env, 500);
+  const cos = cosConfig(env);
+  if (!see && !r2 && !cos) {
+    return json({ ok: false, error: 'IMAGE_STORAGE_NOT_CONFIGURED' }, request, env, 500);
   }
 
   let image;
   try {
-    image = normalizeImageUpload(await readJsonBody(request, MAX_IMAGE_BODY_BYTES), config);
+    image = normalizeImageUpload(await readJsonBody(request, MAX_IMAGE_BODY_BYTES), see || r2 || cos);
   } catch (error) {
     return json({ ok: false, error: error.message || 'INVALID_REQUEST' }, request, env, 400);
   }
 
   try {
-    const result = await uploadImageToCos(image, config);
+    const result = see
+      ? await uploadImageToSee(image, see)
+      : r2
+      ? await uploadImageToR2(image, r2)
+      : await uploadImageToCos(image, cos);
     return json({ ok: true, ...result }, request, env);
   } catch (error) {
     const status = error.status || 500;
-    return json({ ok: false, error: error.message || 'COS_UPLOAD_FAILED' }, request, env, status);
+    return json({ ok: false, error: error.message || 'IMAGE_UPLOAD_FAILED' }, request, env, status);
   }
 }
 
@@ -491,6 +504,28 @@ function cosConfig(env) {
   };
 }
 
+function r2Config(request, env) {
+  if (!env.BLOG_IMAGES_BUCKET) return null;
+  const publicBaseUrl = trimText(env.R2_PUBLIC_BASE_URL, 500).replace(/\/+$/, '')
+    || `${new URL(request.url).origin}/blog-images`;
+  const prefix = normalizeObjectPrefix(env.R2_UPLOAD_PREFIX || env.TENCENT_COS_UPLOAD_PREFIX || env.COS_UPLOAD_PREFIX || DEFAULT_IMAGE_PREFIX);
+  return {
+    bucket: env.BLOG_IMAGES_BUCKET,
+    publicBaseUrl,
+    prefix
+  };
+}
+
+function seeConfig(env) {
+  const token = trimText(env.S_EE_API_KEY || env.SEE_API_KEY || env.SMMS_TOKEN || env.SM_MS_TOKEN, 500);
+  if (!token) return null;
+  return {
+    token,
+    domain: trimText(env.S_EE_DOMAIN || '', 80),
+    prefix: normalizeObjectPrefix(env.S_EE_UPLOAD_PREFIX || DEFAULT_IMAGE_PREFIX)
+  };
+}
+
 function normalizeImageUpload(input, config) {
   const contentType = normalizeImageContentType(input && input.contentType);
   if (!contentType) throw new Error('IMAGE_TYPE_NOT_ALLOWED');
@@ -559,6 +594,130 @@ async function uploadImageToCos(image, config) {
     size: image.bytes.byteLength,
     url: `${publicBase}/${image.key}`
   };
+}
+
+async function uploadImageToSee(image, config) {
+  const form = new FormData();
+  const file = new Blob([image.bytes], { type: image.contentType });
+  form.append('file', file, image.filename);
+  if (config.domain) form.append('domain', config.domain);
+
+  const response = await fetch('https://s.ee/api/v1/file/upload', {
+    method: 'POST',
+    headers: {
+      Authorization: seeAuthorization(config.token),
+      accept: 'application/json'
+    },
+    body: form
+  });
+  const data = await response.json().catch(() => ({}));
+  const url = seeImageUrl(data);
+
+  if (!response.ok || !url) {
+    throw httpError(data.message || data.error || data.code || 'SEE_UPLOAD_FAILED', response.status || 500);
+  }
+
+  return {
+    key: image.key,
+    filename: image.filename,
+    contentType: image.contentType,
+    size: image.bytes.byteLength,
+    url,
+    deleteUrl: data.data?.delete || data.data?.delete_url || ''
+  };
+}
+
+function seeImageUrl(data) {
+  if (!data || typeof data !== 'object') return '';
+  const direct = data.url || data.link || data.image || data.images;
+  if (isHttpUrl(direct)) return direct;
+
+  const item = data.data || {};
+  const nested = item.url || item.link || item.image || item.images || item.page || item.links?.url || item.links?.html;
+  if (isHttpUrl(nested)) return nested;
+
+  return '';
+}
+
+function seeAuthorization(token) {
+  const value = String(token || '').trim();
+  return /^Bearer\s+/i.test(value) ? value : `Bearer ${value}`;
+}
+
+function isHttpUrl(value) {
+  return /^https?:\/\/[^\s]+$/i.test(String(value || '').trim());
+}
+
+async function uploadImageToR2(image, config) {
+  await config.bucket.put(image.key, image.bytes, {
+    httpMetadata: {
+      contentType: image.contentType,
+      cacheControl: 'public, max-age=31536000, immutable'
+    },
+    customMetadata: {
+      filename: image.filename
+    }
+  });
+
+  return {
+    key: image.key,
+    filename: image.filename,
+    contentType: image.contentType,
+    size: image.bytes.byteLength,
+    url: `${config.publicBaseUrl}/${image.key}`
+  };
+}
+
+async function readImageFromR2(request, env) {
+  if (!env.BLOG_IMAGES_BUCKET) {
+    return json({ ok: false, error: 'IMAGE_STORAGE_NOT_CONFIGURED' }, request, env, 404);
+  }
+
+  const key = urlImageKey(new URL(request.url));
+  if (!key) return json({ ok: false, error: 'IMAGE_NOT_FOUND' }, request, env, 404);
+
+  const object = await env.BLOG_IMAGES_BUCKET.get(key);
+  if (!object) return json({ ok: false, error: 'IMAGE_NOT_FOUND' }, request, env, 404);
+
+  return new Response(object.body, {
+    headers: {
+      ...corsHeaders(request, env),
+      'content-type': object.httpMetadata?.contentType || contentTypeFromKey(key),
+      'cache-control': object.httpMetadata?.cacheControl || 'public, max-age=31536000, immutable',
+      etag: object.httpEtag
+    }
+  });
+}
+
+function urlImageKey(url) {
+  const prefix = '/blog-images/';
+  if (!url.pathname.startsWith(prefix)) return '';
+  try {
+    const key = decodeURIComponent(url.pathname.slice(prefix.length));
+    return normalizeObjectKey(key);
+  } catch (error) {
+    return '';
+  }
+}
+
+function normalizeObjectKey(value) {
+  const key = String(value || '').replace(/\\/g, '/').replace(/^\/+/, '');
+  const parts = key.split('/').map((part) => part.trim()).filter(Boolean);
+  if (!parts.length) return '';
+  if (parts.some((part) => part === '.' || part === '..' || part.startsWith('..'))) return '';
+  return parts.join('/');
+}
+
+function contentTypeFromKey(key) {
+  const extension = String(key || '').split('.').pop().toLowerCase();
+  const map = {
+    png: 'image/png',
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    webp: 'image/webp',
+    gif: 'image/gif'
+  };
+  return map[extension] || 'application/octet-stream';
 }
 
 async function tencentCosAuthorization({ method, path, headers, secretId, secretKey }) {

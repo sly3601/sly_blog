@@ -17,6 +17,19 @@ Cloudflare Worker + KV API for the blog skill tree.
 
 The `/write` page can paste screenshots, drag images, or select image files. Configure these Cloudflare secrets/vars before using it:
 
+S.EE path:
+
+- Add Cloudflare secret `S_EE_API_KEY`.
+- Optional var `S_EE_UPLOAD_PREFIX`, default `blog`.
+
+Optional free no-domain Cloudflare R2 path:
+
+- Bind a Cloudflare R2 bucket named `sly-blog-images` as `BLOG_IMAGES_BUCKET`.
+- Optional var `R2_UPLOAD_PREFIX`, default `blog`.
+- Optional var `R2_PUBLIC_BASE_URL`, default is the Pages API `/blog-images` route.
+
+Optional Tencent Cloud COS path:
+
 - `TENCENT_COS_SECRET_ID`: Tencent Cloud API SecretId.
 - `TENCENT_COS_SECRET_KEY`: Tencent Cloud API SecretKey.
 - `TENCENT_COS_BUCKET`: COS bucket name with APPID, for example `sly-blog-1250000000`.
