@@ -4,6 +4,15 @@ const DEFAULT_GITHUB_OWNER = 'sly3601';
 const DEFAULT_GITHUB_REPO = 'sly_blog';
 const DEFAULT_GITHUB_BRANCH = 'main';
 const POSTS_DIR = 'source/_posts';
+const DEFAULT_IMAGE_PREFIX = 'blog';
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const MAX_IMAGE_BODY_BYTES = 14 * 1024 * 1024;
+const IMAGE_TYPES = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/webp': 'webp',
+  'image/gif': 'gif'
+};
 const DEFAULT_ALLOWED_ORIGINS = [
   'https://sly3601.github.io',
   'https://sly-blog.pages.dev',
@@ -31,6 +40,10 @@ export default {
 
     if (url.pathname === '/blog-posts') {
       return blogPosts(request, env);
+    }
+
+    if (url.pathname === '/blog-images') {
+      return blogImages(request, env);
     }
 
     if (url.pathname !== '/skill-tree') {
@@ -90,14 +103,14 @@ function authorize(request, env) {
   return { ok: true };
 }
 
-async function readJsonBody(request) {
+async function readJsonBody(request, maxBytes = MAX_BODY_BYTES) {
   const size = Number(request.headers.get('content-length') || 0);
-  if (size > MAX_BODY_BYTES) {
+  if (size > maxBytes) {
     throw new Error('REQUEST_TOO_LARGE');
   }
 
   const text = await request.text();
-  if (text.length > MAX_BODY_BYTES) {
+  if (text.length > maxBytes) {
     throw new Error('REQUEST_TOO_LARGE');
   }
 
@@ -105,6 +118,46 @@ async function readJsonBody(request) {
     return JSON.parse(text);
   } catch (error) {
     throw new Error('INVALID_JSON');
+  }
+}
+
+async function blogImages(request, env) {
+  if (request.method === 'GET') {
+    return json({
+      ok: true,
+      service: 'blog-images',
+      configured: Boolean(cosConfig(env)),
+      maxBytes: MAX_IMAGE_BYTES
+    }, request, env);
+  }
+
+  if (request.method !== 'POST') {
+    return json({ ok: false, error: 'METHOD_NOT_ALLOWED' }, request, env, 405);
+  }
+
+  const authResult = authorize(request, env);
+  if (!authResult.ok) {
+    return json({ ok: false, error: authResult.error }, request, env, authResult.status);
+  }
+
+  const config = cosConfig(env);
+  if (!config) {
+    return json({ ok: false, error: 'COS_NOT_CONFIGURED' }, request, env, 500);
+  }
+
+  let image;
+  try {
+    image = normalizeImageUpload(await readJsonBody(request, MAX_IMAGE_BODY_BYTES), config);
+  } catch (error) {
+    return json({ ok: false, error: error.message || 'INVALID_REQUEST' }, request, env, 400);
+  }
+
+  try {
+    const result = await uploadImageToCos(image, config);
+    return json({ ok: true, ...result }, request, env);
+  } catch (error) {
+    const status = error.status || 500;
+    return json({ ok: false, error: error.message || 'COS_UPLOAD_FAILED' }, request, env, status);
   }
 }
 
@@ -412,6 +465,202 @@ async function deletePostFromGithub(postPath, env) {
     branch,
     commitUrl: result.commit && result.commit.html_url
   };
+}
+
+function cosConfig(env) {
+  const secretId = trimText(env.TENCENT_COS_SECRET_ID || env.COS_SECRET_ID, 200);
+  const secretKey = trimText(env.TENCENT_COS_SECRET_KEY || env.COS_SECRET_KEY, 200);
+  const bucket = trimText(env.TENCENT_COS_BUCKET || env.COS_BUCKET, 160);
+  const region = trimText(env.TENCENT_COS_REGION || env.COS_REGION, 80);
+  if (!secretId || !secretKey || !bucket || !region) return null;
+  if (!/^[a-z0-9][a-z0-9-]*-\d+$/i.test(bucket)) return null;
+  if (!/^[a-z0-9-]+$/i.test(region)) return null;
+
+  const publicBaseUrl = trimText(env.TENCENT_COS_PUBLIC_BASE_URL || env.COS_PUBLIC_BASE_URL, 500);
+  const prefix = normalizeObjectPrefix(env.TENCENT_COS_UPLOAD_PREFIX || env.COS_UPLOAD_PREFIX || DEFAULT_IMAGE_PREFIX);
+  const host = `${bucket}.cos.${region}.myqcloud.com`;
+
+  return {
+    secretId,
+    secretKey,
+    bucket,
+    region,
+    host,
+    prefix,
+    publicBaseUrl: publicBaseUrl.replace(/\/+$/, '')
+  };
+}
+
+function normalizeImageUpload(input, config) {
+  const contentType = normalizeImageContentType(input && input.contentType);
+  if (!contentType) throw new Error('IMAGE_TYPE_NOT_ALLOWED');
+
+  const base64 = String((input && input.content) || '')
+    .replace(/^data:image\/[a-z0-9.+-]+;base64,/i, '')
+    .replace(/\s/g, '');
+  if (!base64) throw new Error('IMAGE_BODY_REQUIRED');
+  if (Number(input && input.size) > MAX_IMAGE_BYTES) throw new Error('IMAGE_TOO_LARGE');
+
+  let bytes;
+  try {
+    bytes = bytesFromBase64(base64);
+  } catch (error) {
+    throw new Error('IMAGE_BODY_REQUIRED');
+  }
+  if (bytes.byteLength > MAX_IMAGE_BYTES) throw new Error('IMAGE_TOO_LARGE');
+
+  const extension = IMAGE_TYPES[contentType];
+  const key = imageObjectKey(input && input.filename, extension, config.prefix);
+
+  return {
+    bytes,
+    key,
+    contentType,
+    filename: key.split('/').pop()
+  };
+}
+
+async function uploadImageToCos(image, config) {
+  const path = `/${image.key}`;
+  const uploadUrl = `https://${config.host}${path}`;
+  const cacheControl = 'public, max-age=31536000, immutable';
+  const signedHeaders = {
+    host: config.host,
+    'content-type': image.contentType,
+    'cache-control': cacheControl
+  };
+  const authorization = await tencentCosAuthorization({
+    method: 'PUT',
+    path,
+    headers: signedHeaders,
+    secretId: config.secretId,
+    secretKey: config.secretKey
+  });
+
+  const response = await fetch(uploadUrl, {
+    method: 'PUT',
+    headers: {
+      Authorization: authorization,
+      'Content-Type': image.contentType,
+      'Cache-Control': cacheControl
+    },
+    body: image.bytes
+  });
+
+  if (!response.ok) {
+    throw httpError('COS_UPLOAD_FAILED', response.status);
+  }
+
+  const publicBase = config.publicBaseUrl || `https://${config.host}`;
+  return {
+    key: image.key,
+    filename: image.filename,
+    contentType: image.contentType,
+    size: image.bytes.byteLength,
+    url: `${publicBase}/${image.key}`
+  };
+}
+
+async function tencentCosAuthorization({ method, path, headers, secretId, secretKey }) {
+  const now = Math.floor(Date.now() / 1000) - 30;
+  const keyTime = `${now};${now + 600}`;
+  const entries = Object.entries(headers)
+    .map(([key, value]) => [cosEncode(key.toLowerCase()), cosEncode(String(value || '').trim())])
+    .sort((a, b) => a[0].localeCompare(b[0]));
+  const headerList = entries.map(([key]) => key).join(';');
+  const httpHeaders = entries.map(([key, value]) => `${key}=${value}`).join('&');
+  const httpString = `${method.toLowerCase()}\n${path}\n\n${httpHeaders}\n`;
+  const stringToSign = `sha1\n${keyTime}\n${await sha1Hex(httpString)}\n`;
+  const signKey = await hmacSha1Hex(secretKey, keyTime);
+  const signature = await hmacSha1Hex(signKey, stringToSign);
+
+  return [
+    'q-sign-algorithm=sha1',
+    `q-ak=${secretId}`,
+    `q-sign-time=${keyTime}`,
+    `q-key-time=${keyTime}`,
+    `q-header-list=${headerList}`,
+    'q-url-param-list=',
+    `q-signature=${signature}`
+  ].join('&');
+}
+
+function normalizeImageContentType(value) {
+  const text = String(value || '').toLowerCase().split(';')[0].trim();
+  if (text === 'image/jpg') return 'image/jpeg';
+  return IMAGE_TYPES[text] ? text : '';
+}
+
+function imageObjectKey(filename, extension, prefix) {
+  const now = new Date();
+  const year = now.getUTCFullYear();
+  const month = String(now.getUTCMonth() + 1).padStart(2, '0');
+  const name = sanitizeImageName(filename);
+  return `${prefix}/${year}/${month}/${Date.now()}-${randomId()}-${name}.${extension}`;
+}
+
+function sanitizeImageName(value) {
+  const base = String(value || 'image')
+    .split(/[\\/]/)
+    .pop()
+    .replace(/\.[^.]*$/, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 44);
+  return base || 'image';
+}
+
+function normalizeObjectPrefix(value) {
+  const prefix = String(value || DEFAULT_IMAGE_PREFIX)
+    .replace(/\\/g, '/')
+    .split('/')
+    .map((part) => part.trim().replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-|-$/g, ''))
+    .filter(Boolean)
+    .join('/');
+  return prefix || DEFAULT_IMAGE_PREFIX;
+}
+
+function randomId() {
+  const bytes = new Uint8Array(4);
+  crypto.getRandomValues(bytes);
+  return [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function bytesFromBase64(value) {
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes;
+}
+
+async function sha1Hex(value) {
+  const digest = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(value));
+  return hexFromBytes(new Uint8Array(digest));
+}
+
+async function hmacSha1Hex(key, value) {
+  const cryptoKey = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(key),
+    { name: 'HMAC', hash: 'SHA-1' },
+    false,
+    ['sign']
+  );
+  const signature = await crypto.subtle.sign('HMAC', cryptoKey, new TextEncoder().encode(value));
+  return hexFromBytes(new Uint8Array(signature));
+}
+
+function hexFromBytes(bytes) {
+  return [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function cosEncode(value) {
+  return encodeURIComponent(String(value))
+    .replace(/[!'()*]/g, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`);
 }
 
 function githubHeaders(env) {

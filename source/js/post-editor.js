@@ -37,6 +37,8 @@
     localSave: document.getElementById('writeLocalSave'),
     export: document.getElementById('writeExport'),
     publish: document.getElementById('writePublish'),
+    imageUpload: document.getElementById('writeImageUpload'),
+    imageInput: document.getElementById('writeImageInput'),
     clearSecret: document.getElementById('writeClearSecret'),
     editorHost: document.getElementById('writeEditor'),
     status: document.getElementById('writeStatus'),
@@ -111,6 +113,11 @@
     els.localSave.addEventListener('click', () => saveDraft('草稿已保存到当前浏览器'));
     els.export.addEventListener('click', exportMarkdown);
     els.publish.addEventListener('click', publishPost);
+    els.imageUpload.addEventListener('click', () => els.imageInput.click());
+    els.imageInput.addEventListener('change', () => {
+      uploadImages(els.imageInput.files, '选择的图片');
+      els.imageInput.value = '';
+    });
     els.refreshPosts.addEventListener('click', () => loadPostList(true));
     els.loadPost.addEventListener('click', loadSelectedPost);
     els.deletePost.addEventListener('click', deleteSelectedPost);
@@ -128,6 +135,11 @@
         saveDraft('草稿已保存');
       }
     });
+
+    document.addEventListener('paste', handleImagePaste);
+    els.editorHost.addEventListener('dragover', handleImageDragOver);
+    els.editorHost.addEventListener('dragleave', handleImageDragLeave);
+    els.editorHost.addEventListener('drop', handleImageDrop);
   }
 
   async function loadPostList(showMessage) {
@@ -325,14 +337,116 @@
     const text = snippets[kind] || '';
     if (!text) return;
 
+    insertMarkdown(`\n${text}\n`);
+  }
+
+  function insertMarkdown(text) {
     if (editor && typeof editor.insertText === 'function') {
-      editor.insertText(`\n${text}\n`);
+      editor.insertText(text);
     } else if (editor && typeof editor.setMarkdown === 'function') {
       editor.setMarkdown(`${editor.getMarkdown()}\n\n${text}\n`);
     } else if (fallbackTextarea) {
-      insertIntoTextarea(fallbackTextarea, `\n${text}\n`);
+      insertIntoTextarea(fallbackTextarea, text);
     }
     scheduleDraftSave();
+  }
+
+  function handleImagePaste(event) {
+    if (!isEditingMarkdown()) return;
+    const files = Array.from(event.clipboardData?.files || []).filter((file) => file.type.startsWith('image/'));
+    if (!files.length) return;
+    event.preventDefault();
+    uploadImages(files, '粘贴的截图');
+  }
+
+  function handleImageDragOver(event) {
+    const hasImage = Array.from(event.dataTransfer?.items || []).some((item) => item.kind === 'file' && item.type.startsWith('image/'));
+    if (!hasImage) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+    els.editorHost.closest('.write-editor-shell')?.classList.add('is-dragging');
+  }
+
+  function handleImageDragLeave() {
+    els.editorHost.closest('.write-editor-shell')?.classList.remove('is-dragging');
+  }
+
+  function handleImageDrop(event) {
+    const files = Array.from(event.dataTransfer?.files || []).filter((file) => file.type.startsWith('image/'));
+    if (!files.length) return;
+    event.preventDefault();
+    els.editorHost.closest('.write-editor-shell')?.classList.remove('is-dragging');
+    uploadImages(files, '拖入的图片');
+  }
+
+  function isEditingMarkdown() {
+    const active = document.activeElement;
+    if (!active) return true;
+    if (fallbackTextarea && active === fallbackTextarea) return true;
+    if (els.editorHost.contains(active)) return true;
+    return !active.closest('input, textarea, select');
+  }
+
+  async function uploadImages(fileList, sourceLabel) {
+    const files = Array.from(fileList || []).filter((file) => file && file.type.startsWith('image/'));
+    if (!files.length) return;
+    if (!getEndpoint()) {
+      showToast('Cloudflare 接口地址为空');
+      return;
+    }
+    if (!getAdminToken()) {
+      showToast('需要管理员密钥才能上传图片');
+      return;
+    }
+
+    rememberConfig();
+    setLoading([els.imageUpload], true);
+    setStatus(`正在上传 ${files.length} 张图片...`);
+
+    try {
+      for (const file of files) {
+        const data = await uploadOneImage(file);
+        const alt = file.name ? file.name.replace(/\.[^.]+$/, '') : '图片';
+        insertMarkdown(`\n![${escapeMarkdownAlt(alt)}](${data.url})\n`);
+      }
+      setStatus(`${sourceLabel}已上传`);
+      showToast(`${sourceLabel}已插入到光标位置`);
+    } catch (error) {
+      setStatus('图片上传失败');
+      showToast(error.message || '图片上传失败');
+    } finally {
+      setLoading([els.imageUpload], false);
+    }
+  }
+
+  async function uploadOneImage(file) {
+    const content = await fileToBase64(file);
+    return apiRequest('/blog-images', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        filename: file.name || '',
+        contentType: file.type,
+        size: file.size,
+        content
+      })
+    });
+  }
+
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = String(reader.result || '');
+        resolve(result.includes(',') ? result.split(',').pop() : result);
+      };
+      reader.onerror = () => reject(new Error('图片读取失败'));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function escapeMarkdownAlt(value) {
+    return String(value || '图片').replace(/[\[\]\\]/g, '').slice(0, 80) || '图片';
   }
 
   function insertIntoTextarea(textarea, text) {
@@ -574,6 +688,12 @@
       GITHUB_READ_FAILED: 'GitHub 读取失败',
       GITHUB_WRITE_FAILED: 'GitHub 写入失败',
       GITHUB_DELETE_FAILED: 'GitHub 删除失败',
+      IMAGE_TOO_LARGE: '图片太大，单张请控制在 10MB 以内',
+      IMAGE_TYPE_NOT_ALLOWED: '只支持 PNG、JPG、WebP、GIF 图片',
+      IMAGE_BODY_REQUIRED: '没有读到图片内容',
+      COS_NOT_CONFIGURED: '腾讯云 COS 还没配置好',
+      COS_UPLOAD_FAILED: '腾讯云 COS 上传失败',
+      REQUEST_TOO_LARGE: '图片或文章内容太大',
       INVALID_JSON: '请求格式不正确'
     };
     return map[error] || error;

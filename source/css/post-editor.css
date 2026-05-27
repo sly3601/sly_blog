@@ -255,8 +255,17 @@
   font-weight: 900;
 }
 
+.write-file-input {
+  display: none;
+}
+
 .write-editor {
   min-height: 720px;
+}
+
+.write-editor-shell.is-dragging {
+  border-color: rgba(51, 112, 255, 0.78);
+  box-shadow: 0 0 0 4px rgba(51, 112, 255, 0.14), var(--write-shadow);
 }
 
 .write-fallback-textarea {

@@ -30,8 +30,15 @@ GET /blog-posts?action=list
 GET /blog-posts?action=read&path=source/_posts/name.md
 POST /blog-posts
 DELETE /blog-posts?path=source/_posts/name.md
+POST /blog-images
 Authorization: Bearer <ADMIN_TOKEN>
 ```
+
+Image uploads from `/write` need Tencent Cloud COS config:
+
+- Secrets: `TENCENT_COS_SECRET_ID`, `TENCENT_COS_SECRET_KEY`
+- Vars: `TENCENT_COS_BUCKET`, `TENCENT_COS_REGION`, `TENCENT_COS_PUBLIC_BASE_URL`
+- Optional var: `TENCENT_COS_UPLOAD_PREFIX`, default `blog`
 
 Deploy:
 

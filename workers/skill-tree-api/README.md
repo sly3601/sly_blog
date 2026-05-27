@@ -10,7 +10,21 @@ Cloudflare Worker + KV API for the blog skill tree.
 - `GET /blog-posts?action=read&path=source/_posts/name.md`: read one post from GitHub.
 - `POST /blog-posts`: create or update one post in GitHub.
 - `DELETE /blog-posts?path=source/_posts/name.md`: delete one post from GitHub.
+- `POST /blog-images`: upload one image to Tencent Cloud COS and return its public URL. Requires `Authorization: Bearer <ADMIN_TOKEN>`.
 - `GET /health`: health check.
+
+## Image Upload
+
+The `/write` page can paste screenshots, drag images, or select image files. Configure these Cloudflare secrets/vars before using it:
+
+- `TENCENT_COS_SECRET_ID`: Tencent Cloud API SecretId.
+- `TENCENT_COS_SECRET_KEY`: Tencent Cloud API SecretKey.
+- `TENCENT_COS_BUCKET`: COS bucket name with APPID, for example `sly-blog-1250000000`.
+- `TENCENT_COS_REGION`: COS region, for example `ap-guangzhou`.
+- `TENCENT_COS_PUBLIC_BASE_URL`: CDN or custom domain, for example `https://img.example.com`.
+- `TENCENT_COS_UPLOAD_PREFIX`: optional object prefix, default `blog`.
+
+Keep `SECRET_ID` and `SECRET_KEY` as Cloudflare secrets, not committed files.
 
 ## Deploy
 

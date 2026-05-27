@@ -124,6 +124,10 @@ top_img: false
         <button data-insert="callout" class="write-tool" type="button" title="插入提示块">
           <i class="fas fa-lightbulb"></i><span>提示</span>
         </button>
+        <button id="writeImageUpload" class="write-tool" type="button" title="上传图片">
+          <i class="fas fa-image"></i><span>图片</span>
+        </button>
+        <input id="writeImageInput" class="write-file-input" type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple>
         <span id="writeStatus" class="write-status">草稿已就绪</span>
       </div>
       <div id="writeEditor" class="write-editor"></div>
