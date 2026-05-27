@@ -653,7 +653,7 @@ text_align_justify: false
 # can set it to color or image (可設置圖片 或者 顔色)
 # The formal of image: url(http://xxxxxx.com/xxx.jpg)
 # background: url(/img/background.jpg)
-background: url(/img/site/site-bg.jpg)
+background: url(/sly_blog/img/site/site-bg.jpg)
 
 # Footer Background
 footer_bg: false
@@ -1017,11 +1017,11 @@ categoryBar:
   row: 1 #显示行数，默认两行，超过行数切换为滚动显示
   message:
     - descr: 理论
-      cover: /img/site/category-theory.png
+      cover: /sly_blog/img/site/category-theory.png
     - descr: 实操
-      cover: /img/site/category-practice.png
+      cover: /sly_blog/img/site/category-practice.png
     - descr: 日记
-      cover: /img/site/category-diary.png
+      cover: /sly_blog/img/site/category-diary.png
 
   custom_css: https://npm.elemecdn.com/hexo-butterfly-categories-card@1.0.0/lib/categorybar.css
   

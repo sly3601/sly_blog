@@ -3,6 +3,6 @@
   link_list: 
     - name: Hexo 
       link: https://hexo.io/zh-cn/
-      avatar: /img/site/hexo-logo.svg
+      avatar: /sly_blog/img/site/hexo-logo.svg
       descr: 快速、简单且强大的网志框架
-      siteshot: /img/site/hexo-siteshot.jpg
+      siteshot: /sly_blog/img/site/hexo-siteshot.jpg
