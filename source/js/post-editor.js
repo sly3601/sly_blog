@@ -25,6 +25,11 @@
     tags: document.getElementById('writeTags'),
     cover: document.getElementById('writeCover'),
     description: document.getElementById('writeDescription'),
+    postSelect: document.getElementById('writePostSelect'),
+    refreshPosts: document.getElementById('writeRefreshPosts'),
+    loadPost: document.getElementById('writeLoadPost'),
+    newPost: document.getElementById('writeNewPost'),
+    postMeta: document.getElementById('writePostMeta'),
     endpoint: document.getElementById('writeEndpoint'),
     token: document.getElementById('writeAdminToken'),
     overwrite: document.getElementById('writeOverwrite'),
@@ -39,6 +44,8 @@
 
   let editor;
   let fallbackTextarea;
+  let currentPost = null;
+  let postList = [];
   let slugTouched = false;
   let saveTimer;
   let toastTimer;
@@ -50,6 +57,7 @@
     createEditor();
     bindEvents();
     setStatus('草稿已就绪');
+    if (getAdminToken()) loadPostList(false);
   }
 
   function createEditor() {
@@ -102,6 +110,9 @@
     els.localSave.addEventListener('click', () => saveDraft('草稿已保存到当前浏览器'));
     els.export.addEventListener('click', exportMarkdown);
     els.publish.addEventListener('click', publishPost);
+    els.refreshPosts.addEventListener('click', () => loadPostList(true));
+    els.loadPost.addEventListener('click', loadSelectedPost);
+    els.newPost.addEventListener('click', startNewPost);
     els.clearSecret.addEventListener('click', () => {
       els.token.value = '';
       localStorage.removeItem(TOKEN_KEY);
@@ -114,6 +125,127 @@
         saveDraft('草稿已保存');
       }
     });
+  }
+
+  async function loadPostList(showMessage) {
+    if (!getEndpoint()) {
+      showToast('Cloudflare 接口地址为空');
+      return;
+    }
+    if (!getAdminToken()) {
+      showToast('先填写管理员密钥，再刷新文章列表');
+      return;
+    }
+
+    rememberConfig();
+    setStatus('正在读取 GitHub 文章列表...');
+    setLoading([els.refreshPosts, els.loadPost], true);
+
+    try {
+      const data = await apiRequest('/blog-posts?action=list', { method: 'GET' });
+      postList = Array.isArray(data.posts) ? data.posts : [];
+      renderPostOptions();
+      setStatus(`已读取 ${postList.length} 篇文章`);
+      if (showMessage) showToast(`已读取 ${postList.length} 篇文章`);
+    } catch (error) {
+      setStatus('文章列表读取失败');
+      showToast(error.message || '文章列表读取失败');
+    } finally {
+      setLoading([els.refreshPosts, els.loadPost], false);
+    }
+  }
+
+  async function loadSelectedPost() {
+    const path = els.postSelect.value;
+    if (!path) {
+      showToast('先选择一篇文章');
+      return;
+    }
+
+    rememberConfig();
+    setStatus('正在载入文章...');
+    setLoading([els.loadPost, els.refreshPosts], true);
+
+    try {
+      const data = await apiRequest(`/blog-posts?action=read&path=${encodeURIComponent(path)}`, { method: 'GET' });
+      applyLoadedPost(data);
+      saveDraft();
+      showToast(`已载入：${data.filename || path}`);
+    } catch (error) {
+      setStatus('文章载入失败');
+      showToast(error.message || '文章载入失败');
+    } finally {
+      setLoading([els.loadPost, els.refreshPosts], false);
+    }
+  }
+
+  function applyLoadedPost(data) {
+    const meta = data.meta || {};
+    const filename = data.filename || (data.path || '').split('/').pop() || '';
+    els.title.value = meta.title || filename.replace(/\.md$/i, '');
+    els.slug.value = filename.replace(/\.md$/i, '');
+    els.category.value = meta.category || '日记';
+    els.tags.value = Array.isArray(meta.tags) ? meta.tags.join(', ') : '';
+    els.cover.value = meta.cover || '';
+    els.description.value = meta.description || '';
+    els.overwrite.checked = true;
+    slugTouched = true;
+    setMarkdown(data.markdown || '');
+    setCurrentPost({
+      path: data.path || '',
+      filename,
+      date: meta.date || '',
+      htmlUrl: data.htmlUrl || ''
+    });
+    setStatus(`正在编辑：${filename}`);
+  }
+
+  function startNewPost() {
+    setCurrentPost(null);
+    slugTouched = false;
+    els.title.value = '';
+    els.slug.value = '';
+    els.category.value = '日记';
+    els.tags.value = '';
+    els.cover.value = '';
+    els.description.value = '';
+    els.overwrite.checked = false;
+    setMarkdown(DEFAULT_MARKDOWN);
+    saveDraft('已切换到新文章模式');
+  }
+
+  function renderPostOptions() {
+    const selectedPath = currentPost && currentPost.path;
+    els.postSelect.innerHTML = '';
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = postList.length ? '选择一篇文章载入编辑' : '没有读取到文章';
+    els.postSelect.appendChild(placeholder);
+
+    postList.forEach((post) => {
+      const option = document.createElement('option');
+      option.value = post.path;
+      option.textContent = `${post.title || post.filename}${post.date ? ` · ${post.date.slice(0, 10)}` : ''}`;
+      els.postSelect.appendChild(option);
+    });
+
+    if (selectedPath && postList.some((post) => post.path === selectedPath)) {
+      els.postSelect.value = selectedPath;
+    }
+  }
+
+  function setCurrentPost(post) {
+    currentPost = post || null;
+    const publishText = els.publish.querySelector('span');
+    if (publishText) publishText.textContent = currentPost ? '保存修改到 GitHub' : '发布到 GitHub';
+    if (els.postMeta) {
+      els.postMeta.textContent = currentPost
+        ? `正在编辑：${currentPost.filename || currentPost.path}${currentPost.date ? ` · 原日期 ${currentPost.date}` : ''}`
+        : '未载入文章';
+    }
+    if (currentPost && currentPost.path) {
+      els.postSelect.value = currentPost.path;
+    }
   }
 
   function insertSnippet(kind) {
@@ -166,8 +298,9 @@
       cover: els.cover.value.trim(),
       description: els.description.value.trim(),
       markdown: getMarkdown(),
-      overwrite: els.overwrite.checked,
-      date: formatLocalDate(new Date())
+      overwrite: els.overwrite.checked || Boolean(currentPost && currentPost.path),
+      sourcePath: currentPost && currentPost.path ? currentPost.path : '',
+      date: currentPost && currentPost.date ? currentPost.date : formatLocalDate(new Date())
     };
   }
 
@@ -192,7 +325,7 @@
     els.publish.disabled = true;
 
     try {
-      const response = await fetch(`${getEndpoint().replace(/\/+$/, '')}/blog-posts`, {
+      const response = await fetch(`${getApiBase()}/blog-posts`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -206,6 +339,14 @@
         throw new Error(humanizeError(data.error || `HTTP ${response.status}`));
       }
 
+      if (data.path) {
+        setCurrentPost({
+          path: data.path,
+          filename: data.path.split('/').pop(),
+          date: payload.date,
+          htmlUrl: data.htmlUrl || ''
+        });
+      }
       saveDraft();
       setStatus(`已发布：${data.path}`);
       showToast(`已保存到 GitHub：${data.path}`);
@@ -222,6 +363,7 @@
     rememberConfig();
     const draft = {
       ...collectPayload(),
+      currentPost,
       slugTouched,
       updatedAt: new Date().toISOString()
     };
@@ -254,6 +396,7 @@
       els.description.value = draft.description || '';
       els.overwrite.checked = Boolean(draft.overwrite);
       slugTouched = Boolean(draft.slugTouched || draft.slug);
+      setCurrentPost(draft.currentPost || null);
       app.dataset.draftMarkdown = draft.markdown || '';
     } catch (error) {
       localStorage.removeItem(DRAFT_KEY);
@@ -267,6 +410,27 @@
   function rememberConfig() {
     localStorage.setItem(ENDPOINT_KEY, els.endpoint.value.trim());
     if (els.token.value.trim()) localStorage.setItem(TOKEN_KEY, els.token.value.trim());
+  }
+
+  async function apiRequest(path, options = {}) {
+    const response = await fetch(`${getApiBase()}${path}`, {
+      ...options,
+      headers: {
+        Authorization: `Bearer ${getAdminToken()}`,
+        ...(options.headers || {})
+      }
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.ok) {
+      throw new Error(humanizeError(data.error || `HTTP ${response.status}`));
+    }
+    return data;
+  }
+
+  function setLoading(buttons, loading) {
+    buttons.forEach((button) => {
+      if (button) button.disabled = loading;
+    });
   }
 
   function exportMarkdown() {
@@ -323,6 +487,10 @@
     return els.endpoint.value.trim();
   }
 
+  function getApiBase() {
+    return getEndpoint().replace(/\/+$/, '');
+  }
+
   function getAdminToken() {
     return els.token.value.trim();
   }
@@ -333,7 +501,9 @@
       UNAUTHORIZED: '管理员密钥不对',
       TITLE_REQUIRED: '文章标题不能为空',
       BODY_REQUIRED: '正文不能为空',
+      POST_PATH_REQUIRED: '没有指定要读取的文章',
       FILE_EXISTS: '同名文章已存在，勾选“允许覆盖同名文章”后再试',
+      GITHUB_READ_FAILED: 'GitHub 读取失败',
       GITHUB_WRITE_FAILED: 'GitHub 写入失败',
       INVALID_JSON: '请求格式不正确'
     };

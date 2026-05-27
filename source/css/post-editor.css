@@ -155,6 +155,7 @@
 }
 
 .write-field input,
+.write-field select,
 .write-field textarea {
   width: 100%;
   border: 1px solid var(--write-line);
@@ -168,12 +169,18 @@
   transition: border-color 0.16s ease, box-shadow 0.16s ease;
 }
 
+.write-field select {
+  min-height: 40px;
+  cursor: pointer;
+}
+
 .write-field textarea {
   resize: vertical;
   min-height: 86px;
 }
 
 .write-field input:focus,
+.write-field select:focus,
 .write-field textarea:focus {
   border-color: rgba(51, 112, 255, 0.65);
   box-shadow: 0 0 0 3px rgba(51, 112, 255, 0.12);
@@ -191,6 +198,24 @@
 
 .write-check input {
   accent-color: var(--write-blue);
+}
+
+.write-mini-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.write-mini-actions .write-button {
+  min-width: 0;
+  padding: 0 8px;
+}
+
+.write-post-meta {
+  margin: 10px 0 0;
+  color: var(--write-muted);
+  font-size: 0.76rem;
+  line-height: 1.5;
 }
 
 .write-editor-shell {

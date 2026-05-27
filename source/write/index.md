@@ -31,6 +31,30 @@ top_img: false
 
   <main class="write-layout">
     <aside class="write-sidebar" aria-label="文章信息">
+      <section class="write-panel write-existing-panel">
+        <div class="write-panel-title">
+          <i class="fas fa-folder-tree"></i><span>现有文章</span>
+        </div>
+        <label class="write-field">
+          <span>从 GitHub 载入</span>
+          <select id="writePostSelect">
+            <option value="">先刷新文章列表</option>
+          </select>
+        </label>
+        <div class="write-mini-actions">
+          <button id="writeRefreshPosts" class="write-button" type="button">
+            <i class="fas fa-rotate"></i><span>刷新</span>
+          </button>
+          <button id="writeLoadPost" class="write-button" type="button">
+            <i class="fas fa-file-import"></i><span>载入</span>
+          </button>
+          <button id="writeNewPost" class="write-button" type="button">
+            <i class="fas fa-plus"></i><span>新文章</span>
+          </button>
+        </div>
+        <p id="writePostMeta" class="write-post-meta">未载入文章</p>
+      </section>
+
       <section class="write-panel">
         <div class="write-panel-title">
           <i class="fas fa-feather-alt"></i><span>文章信息</span>

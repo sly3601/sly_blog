@@ -109,7 +109,35 @@ async function readJsonBody(request) {
 }
 
 async function blogPosts(request, env) {
+  const url = new URL(request.url);
+
   if (request.method === 'GET') {
+    const action = url.searchParams.get('action') || '';
+    if (action === 'list' || action === 'read') {
+      const authResult = authorize(request, env);
+      if (!authResult.ok) {
+        return json({ ok: false, error: authResult.error }, request, env, authResult.status);
+      }
+      if (!String(env.GITHUB_TOKEN || '').trim()) {
+        return json({ ok: false, error: 'GITHUB_TOKEN_NOT_CONFIGURED' }, request, env, 500);
+      }
+
+      try {
+        if (action === 'list') {
+          const result = await listPostsFromGithub(env);
+          return json({ ok: true, ...result }, request, env);
+        }
+
+        const postPath = normalizePostPath(url.searchParams.get('path') || url.searchParams.get('filename'));
+        if (!postPath) return json({ ok: false, error: 'POST_PATH_REQUIRED' }, request, env, 400);
+        const result = await readPostFromGithub(postPath, env);
+        return json({ ok: true, ...result }, request, env);
+      } catch (error) {
+        const status = error.status || 500;
+        return json({ ok: false, error: error.message || 'GITHUB_READ_FAILED' }, request, env, status);
+      }
+    }
+
     return json({
       ok: true,
       service: 'blog-posts',
@@ -160,31 +188,29 @@ function normalizePost(input) {
     ? input.tags.map((tag) => trimText(tag, 50)).filter(Boolean).slice(0, 20)
     : [];
   const category = trimText(input.category, 50) || '日记';
-  const filename = `${sanitizeFilename(input.slug || title)}.md`;
+  const sourcePath = normalizePostPath(input.sourcePath);
+  const filename = sourcePath ? sourcePath.split('/').pop() : `${sanitizeFilename(input.slug || title)}.md`;
   const date = sanitizeDate(input.date) || formatDate(new Date());
   const description = trimText(input.description, 220);
   const cover = trimText(input.cover, 500);
-  const content = buildPostMarkdown({
-    title,
+
+  return {
+    filename,
+    path: sourcePath || `${POSTS_DIR}/${filename}`,
+    sourcePath,
     date,
     updated: formatDate(new Date()),
     category,
     tags,
     cover,
     description,
-    markdown
-  });
-
-  return {
-    filename,
-    path: `${POSTS_DIR}/${filename}`,
-    content,
+    markdown,
     title,
-    overwrite: Boolean(input.overwrite)
+    overwrite: Boolean(input.overwrite || sourcePath)
   };
 }
 
-function buildPostMarkdown(post) {
+function buildPostMarkdown(post, existingMeta = {}) {
   const lines = [
     '---',
     `title: ${yamlString(post.title)}`,
@@ -199,31 +225,112 @@ function buildPostMarkdown(post) {
   }
   if (post.cover) lines.push(`cover: ${yamlString(post.cover)}`);
   if (post.description) lines.push(`description: ${yamlString(post.description)}`);
+
+  const managedKeys = new Set(['title', 'date', 'updated', 'categories', 'category', 'tags', 'cover', 'description']);
+  Object.entries(existingMeta || {}).forEach(([key, value]) => {
+    if (!key || managedKeys.has(key)) return;
+    lines.push(...formatYamlEntry(key, value));
+  });
+
   lines.push('---', '', post.markdown.trim(), '');
   return lines.join('\n');
 }
 
+async function listPostsFromGithub(env) {
+  const { owner, repo, branch } = githubRepoConfig(env);
+  const endpoint = githubContentsEndpoint(owner, repo, POSTS_DIR);
+  const headers = githubHeaders(env);
+  const response = await fetch(`${endpoint}?ref=${encodeURIComponent(branch)}`, { headers });
+  const items = await response.json().catch(() => []);
+
+  if (!response.ok) {
+    throw httpError((items && items.message) || 'GITHUB_READ_FAILED', response.status);
+  }
+
+  const files = Array.isArray(items)
+    ? items.filter((item) => item && item.type === 'file' && /\.md$/i.test(item.name)).slice(0, 120)
+    : [];
+
+  const posts = await Promise.all(files.map(async (item) => {
+    try {
+      const post = await readPostFromGithub(item.path, env);
+      return {
+        path: item.path,
+        filename: item.name,
+        title: post.meta.title || item.name.replace(/\.md$/i, ''),
+        date: post.meta.date || '',
+        updated: post.meta.updated || '',
+        category: post.meta.category || '',
+        tags: post.meta.tags || [],
+        sha: item.sha || '',
+        htmlUrl: item.html_url || ''
+      };
+    } catch (error) {
+      return {
+        path: item.path,
+        filename: item.name,
+        title: item.name.replace(/\.md$/i, ''),
+        date: '',
+        updated: '',
+        category: '',
+        tags: [],
+        sha: item.sha || '',
+        htmlUrl: item.html_url || ''
+      };
+    }
+  }));
+
+  posts.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')) || a.filename.localeCompare(b.filename, 'zh-Hans-CN'));
+  return { posts, branch, path: POSTS_DIR };
+}
+
+async function readPostFromGithub(postPath, env) {
+  const normalizedPath = normalizePostPath(postPath);
+  if (!normalizedPath) throw httpError('POST_PATH_REQUIRED', 400);
+
+  const { owner, repo, branch } = githubRepoConfig(env);
+  const endpoint = githubContentsEndpoint(owner, repo, normalizedPath);
+  const response = await fetch(`${endpoint}?ref=${encodeURIComponent(branch)}`, { headers: githubHeaders(env) });
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw httpError((data && data.message) || 'GITHUB_READ_FAILED', response.status);
+  }
+
+  const raw = utf8FromBase64(data.content || '');
+  const parsed = parsePostContent(raw);
+  return {
+    path: normalizedPath,
+    filename: normalizedPath.split('/').pop(),
+    sha: data.sha || '',
+    htmlUrl: data.html_url || '',
+    meta: postMetaForClient(parsed.meta),
+    markdown: parsed.markdown,
+    raw
+  };
+}
+
 async function savePostToGithub(post, env) {
-  const owner = trimText(env.GITHUB_OWNER, 80) || DEFAULT_GITHUB_OWNER;
-  const repo = trimText(env.GITHUB_REPO, 80) || DEFAULT_GITHUB_REPO;
-  const branch = trimText(env.GITHUB_BRANCH, 80) || DEFAULT_GITHUB_BRANCH;
-  const encodedPath = post.path.split('/').map(encodeURIComponent).join('/');
-  const endpoint = `https://api.github.com/repos/${owner}/${repo}/contents/${encodedPath}`;
+  const { owner, repo, branch } = githubRepoConfig(env);
+  const endpoint = githubContentsEndpoint(owner, repo, post.path);
   const headers = githubHeaders(env);
 
   let sha = '';
+  let existingMeta = {};
   const existing = await fetch(`${endpoint}?ref=${encodeURIComponent(branch)}`, { headers });
   if (existing.ok) {
     const data = await existing.json();
     sha = data.sha || '';
     if (!post.overwrite) throw httpError('FILE_EXISTS', 409);
+    existingMeta = parsePostContent(utf8FromBase64(data.content || '')).meta;
   } else if (existing.status !== 404) {
     throw httpError('GITHUB_READ_FAILED', existing.status);
   }
 
+  const content = buildPostMarkdown(post, existingMeta);
   const body = {
-    message: `Publish post: ${post.title}`,
-    content: base64FromUtf8(post.content),
+    message: `${sha ? 'Update' : 'Publish'} post: ${post.title}`,
+    content: base64FromUtf8(content),
     branch
   };
   if (sha) body.sha = sha;
@@ -257,6 +364,19 @@ function githubHeaders(env) {
   };
 }
 
+function githubRepoConfig(env) {
+  return {
+    owner: trimText(env.GITHUB_OWNER, 80) || DEFAULT_GITHUB_OWNER,
+    repo: trimText(env.GITHUB_REPO, 80) || DEFAULT_GITHUB_REPO,
+    branch: trimText(env.GITHUB_BRANCH, 80) || DEFAULT_GITHUB_BRANCH
+  };
+}
+
+function githubContentsEndpoint(owner, repo, path) {
+  const encodedPath = path.split('/').map(encodeURIComponent).join('/');
+  return `https://api.github.com/repos/${owner}/${repo}/contents/${encodedPath}`;
+}
+
 function base64FromUtf8(value) {
   const bytes = new TextEncoder().encode(value);
   let binary = '';
@@ -265,6 +385,123 @@ function base64FromUtf8(value) {
     binary += String.fromCharCode(...chunk);
   }
   return btoa(binary);
+}
+
+function utf8FromBase64(value) {
+  const binary = atob(String(value || '').replace(/\s/g, ''));
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return new TextDecoder().decode(bytes);
+}
+
+function normalizePostPath(value) {
+  const text = String(value || '').trim().replace(/\\/g, '/').replace(/^\/+/, '');
+  if (!text) return '';
+  const path = text.startsWith(`${POSTS_DIR}/`) ? text : `${POSTS_DIR}/${text}`;
+  const parts = path.split('/').map((part) => part.trim()).filter(Boolean);
+  if (parts.length < 3 || parts[0] !== 'source' || parts[1] !== '_posts') return '';
+  if (parts.some((part) => part === '.' || part === '..' || part.startsWith('..'))) return '';
+  if (!/\.md$/i.test(parts[parts.length - 1])) return '';
+  return parts.join('/');
+}
+
+function parsePostContent(content) {
+  const text = String(content || '');
+  const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(text);
+  if (!match) return { meta: {}, markdown: text };
+  return {
+    meta: parseSimpleYaml(match[1]),
+    markdown: text.slice(match[0].length)
+  };
+}
+
+function parseSimpleYaml(value) {
+  const meta = {};
+  const lines = String(value || '').split(/\r?\n/);
+
+  for (let index = 0; index < lines.length;) {
+    const line = lines[index];
+    if (!line.trim() || line.trim().startsWith('#')) {
+      index += 1;
+      continue;
+    }
+
+    const match = /^([A-Za-z0-9_-]+):(?:\s*(.*))?$/.exec(line);
+    if (!match) {
+      index += 1;
+      continue;
+    }
+
+    const key = match[1];
+    const rawValue = match[2] || '';
+    if (!rawValue.trim()) {
+      const values = [];
+      let cursor = index + 1;
+      while (cursor < lines.length) {
+        const item = /^\s*-\s*(.*)$/.exec(lines[cursor]);
+        if (!item) break;
+        values.push(parseYamlScalar(item[1]));
+        cursor += 1;
+      }
+      meta[key] = values.length ? values : '';
+      index = values.length ? cursor : index + 1;
+      continue;
+    }
+
+    meta[key] = parseYamlScalar(rawValue.trim());
+    index += 1;
+  }
+
+  return meta;
+}
+
+function parseYamlScalar(value) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  if ((text.startsWith('"') && text.endsWith('"')) || (text.startsWith("'") && text.endsWith("'"))) {
+    if (text.startsWith('"')) {
+      try {
+        return JSON.parse(text);
+      } catch (error) {
+        return text.slice(1, -1);
+      }
+    }
+    return text.slice(1, -1).replace(/''/g, "'");
+  }
+  return text;
+}
+
+function postMetaForClient(meta) {
+  const tags = Array.isArray(meta.tags)
+    ? meta.tags.map((tag) => String(tag || '').trim()).filter(Boolean)
+    : (meta.tags ? [String(meta.tags)] : []);
+  const categories = Array.isArray(meta.categories)
+    ? meta.categories
+    : (meta.categories ? [meta.categories] : (meta.category ? [meta.category] : []));
+
+  return {
+    ...meta,
+    title: String(meta.title || ''),
+    date: String(meta.date || ''),
+    updated: String(meta.updated || ''),
+    category: String(categories[0] || ''),
+    tags,
+    cover: String(meta.cover || ''),
+    description: String(meta.description || '')
+  };
+}
+
+function formatYamlEntry(key, value) {
+  if (!/^[A-Za-z0-9_-]+$/.test(key)) return [];
+  if (Array.isArray(value)) {
+    return value.length
+      ? [`${key}:`, ...value.map((item) => `  - ${yamlString(item)}`)]
+      : [`${key}:`];
+  }
+  if (value === undefined || value === null || value === '') return [`${key}:`];
+  return [`${key}: ${yamlString(value)}`];
 }
 
 function sanitizeFilename(value) {
