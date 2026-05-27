@@ -34,26 +34,24 @@ POST /blog-images
 Authorization: Bearer <ADMIN_TOKEN>
 ```
 
-Image uploads from `/write` use S.EE by default:
+Image uploads from `/write` use a separate GitHub repository by default. Still images are compressed in the browser before upload:
+
+- Secret: `GITHUB_TOKEN` with repo write permission
+- Vars in `wrangler.toml`: `GITHUB_IMAGE_OWNER`, `GITHUB_IMAGE_REPO`, `GITHUB_IMAGE_BRANCH`, `GITHUB_IMAGE_PREFIX`
+- Default image repo: `sly3601/sly_blog_images`
+
+The API creates the public image repo on first upload when the token has permission. It inserts URLs like:
+
+```text
+https://raw.githubusercontent.com/sly3601/sly_blog_images/main/blog/2026/05/example.webp
+```
+
+Optional S.EE fallback:
 
 - Secret: `S_EE_API_KEY`
 - Optional var: `S_EE_UPLOAD_PREFIX`, default `blog`
 
-Optional free no-domain Cloudflare R2 path:
-
-```toml
-[[r2_buckets]]
-binding = "BLOG_IMAGES_BUCKET"
-bucket_name = "sly-blog-images"
-```
-
-When R2 is bound, `/write` uploads to R2 first and inserts URLs like:
-
-```text
-https://sly-skill-tree-api-pages.pages.dev/blog-images/blog/2026/05/example.png
-```
-
-No Tencent Cloud keys or custom domain are required for the R2 path.
+Optional free no-domain Cloudflare R2 path is still supported by binding `BLOG_IMAGES_BUCKET`, but R2 requires Cloudflare billing setup.
 
 Optional Tencent Cloud COS path:
 

@@ -2,6 +2,8 @@
   const DRAFT_KEY = 'sly_blog_post_editor_draft_v1';
   const TOKEN_KEY = 'sly_blog_post_editor_admin_token';
   const ENDPOINT_KEY = 'sly_blog_post_editor_endpoint';
+  const IMAGE_MAX_SIDE = 1800;
+  const IMAGE_WEBP_QUALITY = 0.82;
   const DEFAULT_MARKDOWN = [
     '## 开头',
     '',
@@ -420,16 +422,52 @@
   }
 
   async function uploadOneImage(file) {
-    const content = await fileToBase64(file);
+    const image = await prepareImageForUpload(file);
+    const content = await fileToBase64(image);
     return apiRequest('/blog-images', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        filename: file.name || '',
-        contentType: file.type,
-        size: file.size,
+        filename: image.name || file.name || '',
+        contentType: image.type,
+        size: image.size,
         content
       })
+    });
+  }
+
+  async function prepareImageForUpload(file) {
+    if (!file || file.type === 'image/gif' || !file.type.startsWith('image/')) return file;
+    if (!supportsCanvasCompression()) return file;
+
+    try {
+      const bitmap = await createImageBitmap(file);
+      const scale = Math.min(1, IMAGE_MAX_SIDE / Math.max(bitmap.width, bitmap.height));
+      const width = Math.max(1, Math.round(bitmap.width * scale));
+      const height = Math.max(1, Math.round(bitmap.height * scale));
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext('2d', { alpha: true });
+      context.drawImage(bitmap, 0, 0, width, height);
+      if (typeof bitmap.close === 'function') bitmap.close();
+
+      const blob = await canvasToBlob(canvas, 'image/webp', IMAGE_WEBP_QUALITY);
+      if (!blob || blob.size >= file.size) return file;
+      const filename = `${(file.name || 'image').replace(/\.[^.]+$/, '')}.webp`;
+      return new File([blob], filename, { type: 'image/webp', lastModified: Date.now() });
+    } catch (error) {
+      return file;
+    }
+  }
+
+  function supportsCanvasCompression() {
+    return Boolean(window.createImageBitmap && window.File && HTMLCanvasElement.prototype.toBlob);
+  }
+
+  function canvasToBlob(canvas, type, quality) {
+    return new Promise((resolve) => {
+      canvas.toBlob(resolve, type, quality);
     });
   }
 
@@ -688,6 +726,10 @@
       GITHUB_READ_FAILED: 'GitHub 读取失败',
       GITHUB_WRITE_FAILED: 'GitHub 写入失败',
       GITHUB_DELETE_FAILED: 'GitHub 删除失败',
+      GITHUB_IMAGE_REPO_NOT_FOUND: 'GitHub 图片仓库不存在',
+      GITHUB_IMAGE_REPO_CREATE_FAILED: 'GitHub 图片仓库自动创建失败，请检查 GITHUB_TOKEN 权限',
+      GITHUB_IMAGE_READ_FAILED: 'GitHub 图片仓库读取失败',
+      GITHUB_IMAGE_UPLOAD_FAILED: 'GitHub 图片上传失败',
       IMAGE_TOO_LARGE: '图片太大，单张请控制在 10MB 以内',
       IMAGE_TYPE_NOT_ALLOWED: '只支持 PNG、JPG、WebP、GIF 图片',
       IMAGE_BODY_REQUIRED: '没有读到图片内容',

@@ -2,6 +2,7 @@ const TREE_KEY = 'skill-tree:current';
 const MAX_BODY_BYTES = 1024 * 1024;
 const DEFAULT_GITHUB_OWNER = 'sly3601';
 const DEFAULT_GITHUB_REPO = 'sly_blog';
+const DEFAULT_GITHUB_IMAGE_REPO = 'sly_blog_images';
 const DEFAULT_GITHUB_BRANCH = 'main';
 const POSTS_DIR = 'source/_posts';
 const DEFAULT_IMAGE_PREFIX = 'blog';
@@ -31,7 +32,7 @@ export default {
     }
 
     if (url.pathname === '/' || url.pathname === '/health') {
-      return json({ ok: true, service: 'skill-tree-api-pages' }, request, env);
+      return json({ ok: true, service: 'skill-tree-api' }, request, env);
     }
 
     if (url.pathname === '/github-contributions' || url.pathname === '/github-contributions.svg') {
@@ -122,6 +123,7 @@ async function readJsonBody(request, maxBytes = MAX_BODY_BYTES) {
 }
 
 async function blogImages(request, env) {
+  const github = githubImageConfig(env);
   const see = seeConfig(env);
   const r2 = r2Config(request, env);
 
@@ -134,8 +136,8 @@ async function blogImages(request, env) {
     return json({
       ok: true,
       service: 'blog-images',
-      configured: Boolean(see || r2 || cos),
-      storage: see ? 'see' : (r2 ? 'r2' : (cos ? 'cos' : '')),
+      configured: Boolean(github || see || r2 || cos),
+      storage: github ? 'github' : (see ? 'see' : (r2 ? 'r2' : (cos ? 'cos' : ''))),
       maxBytes: MAX_IMAGE_BYTES
     }, request, env);
   }
@@ -150,19 +152,21 @@ async function blogImages(request, env) {
   }
 
   const cos = cosConfig(env);
-  if (!see && !r2 && !cos) {
+  if (!github && !see && !r2 && !cos) {
     return json({ ok: false, error: 'IMAGE_STORAGE_NOT_CONFIGURED' }, request, env, 500);
   }
 
   let image;
   try {
-    image = normalizeImageUpload(await readJsonBody(request, MAX_IMAGE_BODY_BYTES), see || r2 || cos);
+    image = normalizeImageUpload(await readJsonBody(request, MAX_IMAGE_BODY_BYTES), github || see || r2 || cos);
   } catch (error) {
     return json({ ok: false, error: error.message || 'INVALID_REQUEST' }, request, env, 400);
   }
 
   try {
-    const result = see
+    const result = github
+      ? await uploadImageToGithub(image, github, env)
+      : see
       ? await uploadImageToSee(image, see)
       : r2
       ? await uploadImageToR2(image, r2)
@@ -526,6 +530,27 @@ function seeConfig(env) {
   };
 }
 
+function githubImageConfig(env) {
+  const token = trimText(env.GITHUB_TOKEN, 500);
+  if (!token) return null;
+
+  const owner = trimText(env.GITHUB_IMAGE_OWNER || env.GITHUB_OWNER, 80) || DEFAULT_GITHUB_OWNER;
+  const repo = trimText(env.GITHUB_IMAGE_REPO, 80) || DEFAULT_GITHUB_IMAGE_REPO;
+  const branch = trimText(env.GITHUB_IMAGE_BRANCH, 80) || DEFAULT_GITHUB_BRANCH;
+  const prefix = normalizeObjectPrefix(env.GITHUB_IMAGE_PREFIX || DEFAULT_IMAGE_PREFIX);
+  const publicBaseUrl = trimText(env.GITHUB_IMAGE_PUBLIC_BASE_URL, 500).replace(/\/+$/, '')
+    || `https://raw.githubusercontent.com/${owner}/${repo}/${branch}`;
+
+  return {
+    owner,
+    repo,
+    branch,
+    prefix,
+    publicBaseUrl,
+    autoCreate: String(env.GITHUB_IMAGE_AUTO_CREATE || 'true').toLowerCase() !== 'false'
+  };
+}
+
 function normalizeImageUpload(input, config) {
   const contentType = normalizeImageContentType(input && input.contentType);
   if (!contentType) throw new Error('IMAGE_TYPE_NOT_ALLOWED');
@@ -553,6 +578,82 @@ function normalizeImageUpload(input, config) {
     contentType,
     filename: key.split('/').pop()
   };
+}
+
+async function uploadImageToGithub(image, config, env) {
+  await ensureGithubImageRepo(config, env);
+
+  const path = image.key;
+  const endpoint = githubContentsEndpoint(config.owner, config.repo, path);
+  const headers = githubHeaders(env);
+  let sha = '';
+
+  const existing = await fetch(`${endpoint}?ref=${encodeURIComponent(config.branch)}`, { headers });
+  if (existing.ok) {
+    const data = await existing.json().catch(() => ({}));
+    sha = data.sha || '';
+  } else if (existing.status !== 404) {
+    const data = await existing.json().catch(() => ({}));
+    throw httpError(data.message || 'GITHUB_IMAGE_READ_FAILED', existing.status);
+  }
+
+  const body = {
+    message: `Upload blog image: ${image.filename}`,
+    content: base64FromBytes(image.bytes),
+    branch: config.branch
+  };
+  if (sha) body.sha = sha;
+
+  const response = await fetch(endpoint, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify(body)
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw httpError(result.message || 'GITHUB_IMAGE_UPLOAD_FAILED', response.status);
+  }
+
+  return {
+    key: image.key,
+    filename: image.filename,
+    contentType: image.contentType,
+    size: image.bytes.byteLength,
+    storage: 'github',
+    url: `${config.publicBaseUrl}/${image.key}`,
+    htmlUrl: result.content && result.content.html_url,
+    commitUrl: result.commit && result.commit.html_url
+  };
+}
+
+async function ensureGithubImageRepo(config, env) {
+  const headers = githubHeaders(env);
+  const repoUrl = `https://api.github.com/repos/${encodeURIComponent(config.owner)}/${encodeURIComponent(config.repo)}`;
+  const existing = await fetch(repoUrl, { headers });
+  if (existing.ok) return;
+
+  const data = await existing.json().catch(() => ({}));
+  if (existing.status !== 404 || !config.autoCreate) {
+    throw httpError(data.message || 'GITHUB_IMAGE_REPO_NOT_FOUND', existing.status);
+  }
+
+  const createUrl = config.owner === DEFAULT_GITHUB_OWNER
+    ? 'https://api.github.com/user/repos'
+    : `https://api.github.com/orgs/${encodeURIComponent(config.owner)}/repos`;
+  const created = await fetch(createUrl, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      name: config.repo,
+      private: false,
+      auto_init: true,
+      description: 'Image storage for sly_blog posts'
+    })
+  });
+  const result = await created.json().catch(() => ({}));
+  if (!created.ok) {
+    throw httpError(result.message || 'GITHUB_IMAGE_REPO_CREATE_FAILED', created.status);
+  }
 }
 
 async function uploadImageToCos(image, config) {
@@ -847,6 +948,15 @@ function githubContentsEndpoint(owner, repo, path) {
 
 function base64FromUtf8(value) {
   const bytes = new TextEncoder().encode(value);
+  let binary = '';
+  for (let index = 0; index < bytes.length; index += 0x8000) {
+    const chunk = bytes.subarray(index, index + 0x8000);
+    binary += String.fromCharCode(...chunk);
+  }
+  return btoa(binary);
+}
+
+function base64FromBytes(bytes) {
   let binary = '';
   for (let index = 0; index < bytes.length; index += 0x8000) {
     const chunk = bytes.subarray(index, index + 0x8000);

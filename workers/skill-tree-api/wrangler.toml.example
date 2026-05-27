@@ -10,10 +10,16 @@ id = "replace_with_your_kv_namespace_id"
 
 [vars]
 ALLOWED_ORIGINS = "https://sly3601.github.io,http://localhost:4002,http://localhost:4003"
-# Configure S.EE as Cloudflare secret:
+# /write image uploads use a separate GitHub repo by default.
+# Secret required: GITHUB_TOKEN
+# Optional vars:
+# GITHUB_IMAGE_OWNER = "sly3601"
+# GITHUB_IMAGE_REPO = "sly_blog_images"
+# GITHUB_IMAGE_BRANCH = "main"
+# GITHUB_IMAGE_PREFIX = "blog"
+# GITHUB_IMAGE_AUTO_CREATE = "true"
+# S.EE fallback can still be configured as a Cloudflare secret:
 # S_EE_API_KEY = "paste_in_dashboard_or_wrangler_secret"
-# Optional var:
-# S_EE_UPLOAD_PREFIX = "blog"
 # Optional Tencent Cloud COS image upload config for /write.
 # Keep TENCENT_COS_SECRET_ID and TENCENT_COS_SECRET_KEY as Cloudflare secrets.
 # TENCENT_COS_BUCKET = "sly-blog-1250000000"

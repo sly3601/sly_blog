@@ -50,7 +50,7 @@ favicon: /img/siteicon/32.png
 
 # Avatar (頭像)
 avatar:
-  img: https://s2.loli.net/2024/10/04/RhJfTyMaIS1plQb.jpg
+  img: /img/site/avatar.jpg
   effect: false
 
 # Disable all banner image
@@ -93,8 +93,7 @@ cover:
   position: both
   # When cover is not set, the default cover is displayed (當沒有設置cover時，默認的封面顯示)
   default_cover:
-    # - https://i.loli.net/2020/05/01/gkihqEjXxJ5UZ1C.jpg
-    - https://s2.loli.net/2024/10/04/RhJfTyMaIS1plQb.jpg
+    - /img/site/avatar.jpg
 
 
 
@@ -107,7 +106,7 @@ error_img:
 error_404:
   enable: false
   subtitle: 'Page Not Found'
-  background: https://i.loli.net/2020/05/19/aKOcLiyPl2JQdFD.png
+  background: /img/site/404-bg.png
 
 post_meta:
   page: # Home Page
@@ -654,7 +653,7 @@ text_align_justify: false
 # can set it to color or image (可設置圖片 或者 顔色)
 # The formal of image: url(http://xxxxxx.com/xxx.jpg)
 # background: url(/img/background.jpg)
-background: url(https://s2.loli.net/2024/10/24/GPkbo71gRxTtZd5.jpg)
+background: url(/img/site/site-bg.jpg)
 
 # Footer Background
 footer_bg: false
@@ -1018,11 +1017,11 @@ categoryBar:
   row: 1 #显示行数，默认两行，超过行数切换为滚动显示
   message:
     - descr: 理论
-      cover: https://s2.loli.net/2024/10/05/R7mQ9ck6eUqVBO1.png
+      cover: /img/site/category-theory.png
     - descr: 实操
-      cover: https://s2.loli.net/2024/10/05/o8qbO6UYvnNVmdg.png
+      cover: /img/site/category-practice.png
     - descr: 日记
-      cover: https://s2.loli.net/2024/10/05/uEy9a7nUYs6deV8.png
+      cover: /img/site/category-diary.png
 
   custom_css: https://npm.elemecdn.com/hexo-butterfly-categories-card@1.0.0/lib/categorybar.css
   

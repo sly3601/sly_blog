@@ -10,14 +10,29 @@ Cloudflare Worker + KV API for the blog skill tree.
 - `GET /blog-posts?action=read&path=source/_posts/name.md`: read one post from GitHub.
 - `POST /blog-posts`: create or update one post in GitHub.
 - `DELETE /blog-posts?path=source/_posts/name.md`: delete one post from GitHub.
-- `POST /blog-images`: upload one image to Tencent Cloud COS and return its public URL. Requires `Authorization: Bearer <ADMIN_TOKEN>`.
+- `POST /blog-images`: upload one image and return its public URL. Requires `Authorization: Bearer <ADMIN_TOKEN>`.
 - `GET /health`: health check.
 
 ## Image Upload
 
-The `/write` page can paste screenshots, drag images, or select image files. Configure these Cloudflare secrets/vars before using it:
+The `/write` page can paste screenshots, drag images, or select image files. It compresses still images in the browser before uploading.
 
-S.EE path:
+Default GitHub image repository path:
+
+- Secret: `GITHUB_TOKEN` with repo write permission.
+- Optional var `GITHUB_IMAGE_OWNER`, default `sly3601`.
+- Optional var `GITHUB_IMAGE_REPO`, default `sly_blog_images`.
+- Optional var `GITHUB_IMAGE_BRANCH`, default `main`.
+- Optional var `GITHUB_IMAGE_PREFIX`, default `blog`.
+- Optional var `GITHUB_IMAGE_AUTO_CREATE`, default `true`.
+
+The API creates the public image repo on first upload when the token has permission. It returns raw GitHub URLs like:
+
+```text
+https://raw.githubusercontent.com/sly3601/sly_blog_images/main/blog/2026/05/example.webp
+```
+
+Optional S.EE fallback:
 
 - Add Cloudflare secret `S_EE_API_KEY`.
 - Optional var `S_EE_UPLOAD_PREFIX`, default `blog`.
