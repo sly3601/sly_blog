@@ -80,8 +80,20 @@ top_img: false
         </label>
         <label class="write-field">
           <span>封面图</span>
-          <input id="writeCover" type="url" placeholder="可选，文章封面 URL">
+          <div class="write-cover-input-row">
+            <input id="writeCover" type="url" placeholder="可选，可粘贴 URL 或上传图片">
+            <button id="writeCoverUpload" class="write-icon-button" type="button" title="上传封面图" aria-label="上传封面图">
+              <i class="fas fa-upload"></i>
+            </button>
+          </div>
         </label>
+        <input id="writeCoverInput" class="write-file-input" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
+        <div id="writeCoverPreview" class="write-cover-preview" hidden>
+          <img id="writeCoverPreviewImage" alt="封面预览">
+          <button id="writeCoverClear" class="write-icon-button" type="button" title="清除封面图" aria-label="清除封面图">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
         <label class="write-field">
           <span>摘要</span>
           <textarea id="writeDescription" rows="4" maxlength="220" placeholder="可选，首页卡片摘要"></textarea>

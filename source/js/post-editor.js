@@ -4,6 +4,9 @@
   const ENDPOINT_KEY = 'sly_blog_post_editor_endpoint';
   const IMAGE_MAX_SIDE = 1800;
   const IMAGE_WEBP_QUALITY = 0.82;
+  const IMAGE_REF_START = '<!-- write-image-refs:start -->';
+  const IMAGE_REF_END = '<!-- write-image-refs:end -->';
+  const IMAGE_REF_PREFIX = 'img';
   const DEFAULT_MARKDOWN = [
     '## 开头',
     '',
@@ -39,6 +42,11 @@
     localSave: document.getElementById('writeLocalSave'),
     export: document.getElementById('writeExport'),
     publish: document.getElementById('writePublish'),
+    coverUpload: document.getElementById('writeCoverUpload'),
+    coverInput: document.getElementById('writeCoverInput'),
+    coverPreview: document.getElementById('writeCoverPreview'),
+    coverPreviewImage: document.getElementById('writeCoverPreviewImage'),
+    coverClear: document.getElementById('writeCoverClear'),
     imageUpload: document.getElementById('writeImageUpload'),
     imageInput: document.getElementById('writeImageInput'),
     clearSecret: document.getElementById('writeClearSecret'),
@@ -61,6 +69,7 @@
     restoreDraft();
     createEditor();
     bindEvents();
+    updateCoverPreview();
     setStatus('草稿已就绪');
     if (getAdminToken()) loadPostList(false);
   }
@@ -103,6 +112,7 @@
         if (input === els.title && !slugTouched) {
           els.slug.value = toFileSlug(els.title.value);
         }
+        if (input === els.cover) updateCoverPreview();
         scheduleDraftSave();
       });
       input.addEventListener('change', scheduleDraftSave);
@@ -115,6 +125,16 @@
     els.localSave.addEventListener('click', () => saveDraft('草稿已保存到当前浏览器'));
     els.export.addEventListener('click', exportMarkdown);
     els.publish.addEventListener('click', publishPost);
+    els.coverUpload.addEventListener('click', () => els.coverInput.click());
+    els.coverInput.addEventListener('change', () => {
+      uploadCoverImage(els.coverInput.files && els.coverInput.files[0]);
+      els.coverInput.value = '';
+    });
+    els.coverClear.addEventListener('click', () => {
+      els.cover.value = '';
+      updateCoverPreview();
+      saveDraft('封面图已清除');
+    });
     els.imageUpload.addEventListener('click', () => els.imageInput.click());
     els.imageInput.addEventListener('change', () => {
       uploadImages(els.imageInput.files, '选择的图片');
@@ -139,6 +159,13 @@
     });
 
     document.addEventListener('paste', handleImagePaste);
+    els.cover.addEventListener('paste', handleCoverPaste);
+    els.cover.addEventListener('dragover', handleCoverDragOver);
+    els.cover.addEventListener('dragleave', handleCoverDragLeave);
+    els.cover.addEventListener('drop', handleCoverDrop);
+    els.coverPreview.addEventListener('dragover', handleCoverDragOver);
+    els.coverPreview.addEventListener('dragleave', handleCoverDragLeave);
+    els.coverPreview.addEventListener('drop', handleCoverDrop);
     els.editorHost.addEventListener('dragover', handleImageDragOver);
     els.editorHost.addEventListener('dragleave', handleImageDragLeave);
     els.editorHost.addEventListener('drop', handleImageDrop);
@@ -247,6 +274,7 @@
     els.category.value = meta.category || '日记';
     els.tags.value = Array.isArray(meta.tags) ? meta.tags.join(', ') : '';
     els.cover.value = meta.cover || '';
+    updateCoverPreview();
     els.description.value = meta.description || '';
     els.overwrite.checked = true;
     slugTouched = true;
@@ -268,6 +296,7 @@
     els.category.value = '日记';
     els.tags.value = '';
     els.cover.value = '';
+    updateCoverPreview();
     els.description.value = '';
     els.overwrite.checked = false;
     setMarkdown(DEFAULT_MARKDOWN);
@@ -381,6 +410,41 @@
     uploadImages(files, '拖入的图片');
   }
 
+  function handleCoverPaste(event) {
+    const files = imageFilesFromList(event.clipboardData?.files);
+    if (!files.length) return;
+    event.preventDefault();
+    uploadCoverImage(files[0]);
+  }
+
+  function handleCoverDragOver(event) {
+    const hasImage = Array.from(event.dataTransfer?.items || []).some((item) => item.kind === 'file' && item.type.startsWith('image/'));
+    if (!hasImage) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+    setCoverDragging(true);
+  }
+
+  function handleCoverDragLeave() {
+    setCoverDragging(false);
+  }
+
+  function handleCoverDrop(event) {
+    const files = imageFilesFromList(event.dataTransfer?.files);
+    if (!files.length) return;
+    event.preventDefault();
+    setCoverDragging(false);
+    uploadCoverImage(files[0]);
+  }
+
+  function setCoverDragging(active) {
+    els.coverPreview.classList.toggle('is-dragging', active);
+  }
+
+  function imageFilesFromList(fileList) {
+    return Array.from(fileList || []).filter((file) => file && file.type.startsWith('image/'));
+  }
+
   function isEditingMarkdown() {
     const active = document.activeElement;
     if (!active) return true;
@@ -390,7 +454,7 @@
   }
 
   async function uploadImages(fileList, sourceLabel) {
-    const files = Array.from(fileList || []).filter((file) => file && file.type.startsWith('image/'));
+    const files = imageFilesFromList(fileList);
     if (!files.length) return;
     if (!getEndpoint()) {
       showToast('Cloudflare 接口地址为空');
@@ -406,18 +470,65 @@
     setStatus(`正在上传 ${files.length} 张图片...`);
 
     try {
+      const refs = readImageRefs(getMarkdown());
       for (const file of files) {
         const data = await uploadOneImage(file);
         const alt = file.name ? file.name.replace(/\.[^.]+$/, '') : '图片';
-        insertMarkdown(`\n![${escapeMarkdownAlt(alt)}](${data.url})\n`);
+        const refId = nextImageRefId(refs);
+        refs.set(refId, data.url);
+        insertMarkdown(`\n![${escapeMarkdownAlt(alt)}][${refId}]\n`);
       }
+      setMarkdown(writeImageRefs(getMarkdown(), refs));
+      scheduleDraftSave();
       setStatus(`${sourceLabel}已上传`);
-      showToast(`${sourceLabel}已插入到光标位置`);
+      showToast(`${sourceLabel}已插入短标记，长链接已收纳到文末`);
     } catch (error) {
       setStatus('图片上传失败');
       showToast(error.message || '图片上传失败');
     } finally {
       setLoading([els.imageUpload], false);
+    }
+  }
+
+  async function uploadCoverImage(file) {
+    if (!file || !file.type.startsWith('image/')) return;
+    if (!getEndpoint()) {
+      showToast('Cloudflare 接口地址为空');
+      return;
+    }
+    if (!getAdminToken()) {
+      showToast('需要管理员密钥才能上传封面图');
+      return;
+    }
+
+    rememberConfig();
+    setLoading([els.coverUpload, els.coverClear], true);
+    setStatus('正在上传封面图...');
+
+    try {
+      const data = await uploadOneImage(file);
+      els.cover.value = data.url;
+      updateCoverPreview();
+      saveDraft('封面图已上传');
+      setStatus('封面图已上传');
+    } catch (error) {
+      setStatus('封面图上传失败');
+      showToast(error.message || '封面图上传失败');
+    } finally {
+      setLoading([els.coverUpload, els.coverClear], false);
+    }
+  }
+
+  function updateCoverPreview() {
+    const url = els.cover.value.trim();
+    if (!url) {
+      els.coverPreview.hidden = true;
+      els.coverPreviewImage.removeAttribute('src');
+      return;
+    }
+    els.coverPreview.hidden = false;
+    if (els.coverPreviewImage.src !== url) {
+      els.coverPreviewImage.src = url;
     }
   }
 
@@ -485,6 +596,42 @@
 
   function escapeMarkdownAlt(value) {
     return String(value || '图片').replace(/[\[\]\\]/g, '').slice(0, 80) || '图片';
+  }
+
+  function readImageRefs(markdown) {
+    const refs = new Map();
+    const match = imageRefBlockPattern().exec(String(markdown || ''));
+    if (!match) return refs;
+
+    match[1].split(/\r?\n/).forEach((line) => {
+      const ref = /^\s*\[([A-Za-z0-9_-]+)\]:\s*(\S+)\s*$/.exec(line);
+      if (ref) refs.set(ref[1], ref[2]);
+    });
+    return refs;
+  }
+
+  function writeImageRefs(markdown, refs) {
+    const body = String(markdown || '').replace(imageRefBlockPattern(), '').trimEnd();
+    const lines = Array.from(refs.entries()).map(([id, url]) => `[${id}]: ${url}`);
+    if (!lines.length) return `${body}\n`;
+    return `${body}\n\n${IMAGE_REF_START}\n${lines.join('\n')}\n${IMAGE_REF_END}\n`;
+  }
+
+  function nextImageRefId(refs) {
+    let max = 0;
+    refs.forEach((_, id) => {
+      const match = new RegExp(`^${IMAGE_REF_PREFIX}-(\\d+)$`).exec(id);
+      if (match) max = Math.max(max, Number(match[1]));
+    });
+    return `${IMAGE_REF_PREFIX}-${max + 1}`;
+  }
+
+  function imageRefBlockPattern() {
+    return new RegExp(`${escapeRegExp(IMAGE_REF_START)}\\s*\\n([\\s\\S]*?)\\n\\s*${escapeRegExp(IMAGE_REF_END)}`, 'm');
+  }
+
+  function escapeRegExp(value) {
+    return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
   function insertIntoTextarea(textarea, text) {
