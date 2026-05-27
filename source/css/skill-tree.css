@@ -403,6 +403,8 @@ body.skill-tree-page #page .page-title {
   height: 760px;
   overflow: hidden;
   cursor: grab;
+  touch-action: none;
+  overscroll-behavior: contain;
   background:
     radial-gradient(circle at 52% 46%, rgba(255, 199, 93, 0.12), transparent 31%),
     linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
@@ -506,6 +508,7 @@ body.skill-tree-page #page .page-title {
     radial-gradient(circle at 20% 12%, color-mix(in srgb, var(--domain-color), transparent 58%), transparent 48%);
   color: #f8f3df;
   cursor: grab;
+  touch-action: none;
   user-select: none;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.15),

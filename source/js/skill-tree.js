@@ -480,7 +480,7 @@
   function renderNodes() {
     els.nodes.innerHTML = `${renderDomainLegend()}${tree.nodes.map(renderNode).join('')}`;
     els.nodes.querySelectorAll('.skill-node').forEach((nodeEl) => {
-      nodeEl.addEventListener('pointerdown', startNodeDrag);
+      nodeEl.addEventListener('pointerdown', startNodeDrag, { passive: false });
       nodeEl.addEventListener('click', (event) => {
         if (event.target.closest('a')) return;
         if (suppressClick) {
@@ -903,9 +903,13 @@
     scheduleSave();
   }
 
+  function preventViewportScroll(event) {
+    if (event.cancelable) event.preventDefault();
+  }
+
   function startNodeDrag(event) {
     if (event.target.closest('a')) return;
-    event.preventDefault();
+    preventViewportScroll(event);
     const nodeEl = event.currentTarget;
     const item = getNode(nodeEl.dataset.id);
     if (!item) return;
@@ -928,6 +932,7 @@
     if (!dragNode) return;
     const item = getNode(dragNode.id);
     if (!item) return;
+    preventViewportScroll(event);
     const dx = (event.clientX - dragNode.startX) / tree.view.scale;
     const dy = (event.clientY - dragNode.startY) / tree.view.scale;
     if (Math.abs(dx) > 2 || Math.abs(dy) > 2) dragNode.moved = true;
@@ -956,6 +961,7 @@
 
   function startPan(event) {
     if (event.target.closest('.skill-node')) return;
+    preventViewportScroll(event);
     panState = {
       pointerId: event.pointerId,
       startX: event.clientX,
@@ -969,6 +975,7 @@
 
   function movePan(event) {
     if (!panState || dragNode) return;
+    preventViewportScroll(event);
     tree.view.x = panState.viewX + event.clientX - panState.startX;
     tree.view.y = panState.viewY + event.clientY - panState.startY;
     applyView();
@@ -976,6 +983,7 @@
 
   function stopPan(event) {
     if (!panState) return;
+    preventViewportScroll(event);
     if (els.viewport.hasPointerCapture(event.pointerId)) els.viewport.releasePointerCapture(event.pointerId);
     els.viewport.classList.remove('is-panning');
     panState = null;
@@ -1020,19 +1028,19 @@
   });
   els.reset.addEventListener('click', resetTree);
 
-  els.viewport.addEventListener('pointerdown', startPan);
+  els.viewport.addEventListener('pointerdown', startPan, { passive: false });
   els.viewport.addEventListener('pointermove', (event) => {
     moveNode(event);
     movePan(event);
-  });
+  }, { passive: false });
   els.viewport.addEventListener('pointerup', (event) => {
     stopNodeDrag(event);
     stopPan(event);
-  });
+  }, { passive: false });
   els.viewport.addEventListener('pointercancel', (event) => {
     stopNodeDrag(event);
     stopPan(event);
-  });
+  }, { passive: false });
   els.viewport.addEventListener('wheel', (event) => {
     event.preventDefault();
     zoom(event.deltaY > 0 ? -0.08 : 0.08);
