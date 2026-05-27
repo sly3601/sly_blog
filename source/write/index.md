@@ -48,6 +48,9 @@ top_img: false
           <button id="writeLoadPost" class="write-button" type="button">
             <i class="fas fa-file-import"></i><span>载入</span>
           </button>
+          <button id="writeDeletePost" class="write-button write-button-danger" type="button" disabled>
+            <i class="fas fa-trash-alt"></i><span>删除</span>
+          </button>
           <button id="writeNewPost" class="write-button" type="button">
             <i class="fas fa-plus"></i><span>新文章</span>
           </button>

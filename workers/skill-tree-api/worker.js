@@ -148,6 +148,28 @@ async function blogPosts(request, env) {
     }, request, env);
   }
 
+  if (request.method === 'DELETE') {
+    const authResult = authorize(request, env);
+    if (!authResult.ok) {
+      return json({ ok: false, error: authResult.error }, request, env, authResult.status);
+    }
+
+    if (!String(env.GITHUB_TOKEN || '').trim()) {
+      return json({ ok: false, error: 'GITHUB_TOKEN_NOT_CONFIGURED' }, request, env, 500);
+    }
+
+    const postPath = normalizePostPath(url.searchParams.get('path') || url.searchParams.get('filename'));
+    if (!postPath) return json({ ok: false, error: 'POST_PATH_REQUIRED' }, request, env, 400);
+
+    try {
+      const result = await deletePostFromGithub(postPath, env);
+      return json({ ok: true, ...result }, request, env);
+    } catch (error) {
+      const status = error.status || 500;
+      return json({ ok: false, error: error.message || 'GITHUB_DELETE_FAILED' }, request, env, status);
+    }
+  }
+
   if (request.method !== 'POST') {
     return json({ ok: false, error: 'METHOD_NOT_ALLOWED' }, request, env, 405);
   }
@@ -350,6 +372,44 @@ async function savePostToGithub(post, env) {
     path: post.path,
     branch,
     htmlUrl: result.content && result.content.html_url,
+    commitUrl: result.commit && result.commit.html_url
+  };
+}
+
+async function deletePostFromGithub(postPath, env) {
+  const normalizedPath = normalizePostPath(postPath);
+  if (!normalizedPath) throw httpError('POST_PATH_REQUIRED', 400);
+
+  const { owner, repo, branch } = githubRepoConfig(env);
+  const endpoint = githubContentsEndpoint(owner, repo, normalizedPath);
+  const headers = githubHeaders(env);
+  const existing = await fetch(`${endpoint}?ref=${encodeURIComponent(branch)}`, { headers });
+  const data = await existing.json().catch(() => ({}));
+
+  if (!existing.ok) {
+    if (existing.status === 404) throw httpError('POST_NOT_FOUND', 404);
+    throw httpError((data && data.message) || 'GITHUB_READ_FAILED', existing.status);
+  }
+  if (!data.sha) throw httpError('GITHUB_READ_FAILED', 500);
+
+  const response = await fetch(endpoint, {
+    method: 'DELETE',
+    headers,
+    body: JSON.stringify({
+      message: `Delete post: ${normalizedPath.split('/').pop()}`,
+      sha: data.sha,
+      branch
+    })
+  });
+
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw httpError(result.message || 'GITHUB_DELETE_FAILED', response.status);
+  }
+
+  return {
+    path: normalizedPath,
+    branch,
     commitUrl: result.commit && result.commit.html_url
   };
 }
@@ -816,7 +876,7 @@ function corsHeaders(request, env) {
 
   return {
     'access-control-allow-origin': allowOrigin,
-    'access-control-allow-methods': 'GET, PUT, POST, OPTIONS',
+    'access-control-allow-methods': 'GET, PUT, POST, DELETE, OPTIONS',
     'access-control-allow-headers': 'Content-Type, Authorization, x-admin-token',
     'access-control-max-age': '86400',
     vary: 'Origin'

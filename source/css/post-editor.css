@@ -101,6 +101,17 @@
   color: #fff;
 }
 
+.write-button-danger {
+  border-color: rgba(217, 45, 32, 0.2);
+  background: #fff7f6;
+  color: #b42318;
+}
+
+.write-button-danger:hover {
+  border-color: rgba(217, 45, 32, 0.5);
+  box-shadow: 0 8px 24px rgba(217, 45, 32, 0.12);
+}
+
 .write-button-wide {
   width: 100%;
 }
@@ -202,7 +213,7 @@
 
 .write-mini-actions {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
 }
 

@@ -6,6 +6,10 @@ Cloudflare Worker + KV API for the blog skill tree.
 
 - `GET /skill-tree`: read the current public skill tree JSON.
 - `PUT /skill-tree`: write the skill tree JSON. Requires `Authorization: Bearer <ADMIN_TOKEN>`.
+- `GET /blog-posts?action=list`: list Markdown posts in GitHub. Requires `Authorization: Bearer <ADMIN_TOKEN>`.
+- `GET /blog-posts?action=read&path=source/_posts/name.md`: read one post from GitHub.
+- `POST /blog-posts`: create or update one post in GitHub.
+- `DELETE /blog-posts?path=source/_posts/name.md`: delete one post from GitHub.
 - `GET /health`: health check.
 
 ## Deploy

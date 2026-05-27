@@ -28,6 +28,7 @@
     postSelect: document.getElementById('writePostSelect'),
     refreshPosts: document.getElementById('writeRefreshPosts'),
     loadPost: document.getElementById('writeLoadPost'),
+    deletePost: document.getElementById('writeDeletePost'),
     newPost: document.getElementById('writeNewPost'),
     postMeta: document.getElementById('writePostMeta'),
     endpoint: document.getElementById('writeEndpoint'),
@@ -112,7 +113,9 @@
     els.publish.addEventListener('click', publishPost);
     els.refreshPosts.addEventListener('click', () => loadPostList(true));
     els.loadPost.addEventListener('click', loadSelectedPost);
+    els.deletePost.addEventListener('click', deleteSelectedPost);
     els.newPost.addEventListener('click', startNewPost);
+    els.postSelect.addEventListener('change', updateDeleteState);
     els.clearSecret.addEventListener('click', () => {
       els.token.value = '';
       localStorage.removeItem(TOKEN_KEY);
@@ -139,7 +142,7 @@
 
     rememberConfig();
     setStatus('正在读取 GitHub 文章列表...');
-    setLoading([els.refreshPosts, els.loadPost], true);
+    setLoading([els.refreshPosts, els.loadPost, els.deletePost], true);
 
     try {
       const data = await apiRequest('/blog-posts?action=list', { method: 'GET' });
@@ -151,7 +154,8 @@
       setStatus('文章列表读取失败');
       showToast(error.message || '文章列表读取失败');
     } finally {
-      setLoading([els.refreshPosts, els.loadPost], false);
+      setLoading([els.refreshPosts, els.loadPost, els.deletePost], false);
+      updateDeleteState();
     }
   }
 
@@ -164,7 +168,7 @@
 
     rememberConfig();
     setStatus('正在载入文章...');
-    setLoading([els.loadPost, els.refreshPosts], true);
+    setLoading([els.loadPost, els.refreshPosts, els.deletePost], true);
 
     try {
       const data = await apiRequest(`/blog-posts?action=read&path=${encodeURIComponent(path)}`, { method: 'GET' });
@@ -175,7 +179,49 @@
       setStatus('文章载入失败');
       showToast(error.message || '文章载入失败');
     } finally {
-      setLoading([els.loadPost, els.refreshPosts], false);
+      setLoading([els.loadPost, els.refreshPosts, els.deletePost], false);
+      updateDeleteState();
+    }
+  }
+
+  async function deleteSelectedPost() {
+    const target = getSelectedPost();
+    if (!target) {
+      showToast('先选择一篇文章');
+      return;
+    }
+    if (!getEndpoint()) {
+      showToast('Cloudflare 接口地址为空');
+      return;
+    }
+    if (!getAdminToken()) {
+      showToast('需要管理员密钥才能删除 GitHub 文章');
+      return;
+    }
+
+    const targetName = target.title || target.filename || target.path;
+    const confirmed = window.confirm(`确定要删除「${targetName}」吗？\n\n这会从 GitHub 仓库删除 Markdown 源文件，并触发一次重新部署。`);
+    if (!confirmed) return;
+
+    rememberConfig();
+    setStatus('正在删除文章...');
+    setLoading([els.deletePost, els.loadPost, els.refreshPosts, els.publish], true);
+
+    try {
+      const data = await apiRequest(`/blog-posts?path=${encodeURIComponent(target.path)}`, { method: 'DELETE' });
+      postList = postList.filter((post) => post.path !== target.path);
+      if (currentPost && currentPost.path === target.path) {
+        startNewPost();
+      }
+      renderPostOptions();
+      setStatus(`已删除：${data.path || target.path}`);
+      showToast(`已删除：${targetName}`);
+    } catch (error) {
+      setStatus('删除失败');
+      showToast(error.message || '删除失败，请稍后重试');
+    } finally {
+      setLoading([els.deletePost, els.loadPost, els.refreshPosts, els.publish], false);
+      updateDeleteState();
     }
   }
 
@@ -232,6 +278,7 @@
     if (selectedPath && postList.some((post) => post.path === selectedPath)) {
       els.postSelect.value = selectedPath;
     }
+    updateDeleteState();
   }
 
   function setCurrentPost(post) {
@@ -245,7 +292,27 @@
     }
     if (currentPost && currentPost.path) {
       els.postSelect.value = currentPost.path;
+    } else if (els.postSelect) {
+      els.postSelect.value = '';
     }
+    updateDeleteState();
+  }
+
+  function getSelectedPost() {
+    const path = els.postSelect.value || (currentPost && currentPost.path) || '';
+    if (!path) return null;
+    const fromList = postList.find((post) => post.path === path);
+    if (fromList) return fromList;
+    if (currentPost && currentPost.path === path) return currentPost;
+    return {
+      path,
+      filename: path.split('/').pop()
+    };
+  }
+
+  function updateDeleteState() {
+    if (!els.deletePost) return;
+    els.deletePost.disabled = !getSelectedPost();
   }
 
   function insertSnippet(kind) {
@@ -502,9 +569,11 @@
       TITLE_REQUIRED: '文章标题不能为空',
       BODY_REQUIRED: '正文不能为空',
       POST_PATH_REQUIRED: '没有指定要读取的文章',
+      POST_NOT_FOUND: 'GitHub 里没有找到这篇文章',
       FILE_EXISTS: '同名文章已存在，勾选“允许覆盖同名文章”后再试',
       GITHUB_READ_FAILED: 'GitHub 读取失败',
       GITHUB_WRITE_FAILED: 'GitHub 写入失败',
+      GITHUB_DELETE_FAILED: 'GitHub 删除失败',
       INVALID_JSON: '请求格式不正确'
     };
     return map[error] || error;

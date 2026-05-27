@@ -23,6 +23,16 @@ PUT /skill-tree
 Authorization: Bearer <ADMIN_TOKEN>
 ```
 
+The `/write` page also uses:
+
+```text
+GET /blog-posts?action=list
+GET /blog-posts?action=read&path=source/_posts/name.md
+POST /blog-posts
+DELETE /blog-posts?path=source/_posts/name.md
+Authorization: Bearer <ADMIN_TOKEN>
+```
+
 Deploy:
 
 ```powershell
