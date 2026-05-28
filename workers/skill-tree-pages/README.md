@@ -34,6 +34,15 @@ POST /blog-images
 Authorization: Bearer <ADMIN_TOKEN>
 ```
 
+The private `/nav/` page uses the same admin token:
+
+```text
+GET /nav-sites
+PUT /nav-sites
+DELETE /nav-sites
+Authorization: Bearer <ADMIN_TOKEN>
+```
+
 Image uploads from `/write` use a separate GitHub repository by default. Still images are compressed in the browser before upload:
 
 - Secret: `GITHUB_TOKEN` with repo write permission

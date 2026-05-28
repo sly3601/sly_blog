@@ -11,6 +11,9 @@ Cloudflare Worker + KV API for the blog skill tree.
 - `POST /blog-posts`: create or update one post in GitHub.
 - `DELETE /blog-posts?path=source/_posts/name.md`: delete one post from GitHub.
 - `POST /blog-images`: upload one image and return its public URL. Requires `Authorization: Bearer <ADMIN_TOKEN>`.
+- `GET /nav-sites`: read private navigation bookmarks. Requires `Authorization: Bearer <ADMIN_TOKEN>`.
+- `PUT /nav-sites`: replace private navigation bookmarks. Requires `Authorization: Bearer <ADMIN_TOKEN>`.
+- `DELETE /nav-sites`: clear private navigation bookmarks. Requires `Authorization: Bearer <ADMIN_TOKEN>`.
 - `GET /health`: health check.
 
 ## Image Upload

@@ -1,4 +1,5 @@
 const TREE_KEY = 'skill-tree:current';
+const NAV_SITES_KEY = 'navigator:sites';
 const MAX_BODY_BYTES = 1024 * 1024;
 const DEFAULT_GITHUB_OWNER = 'sly3601';
 const DEFAULT_GITHUB_REPO = 'sly_blog';
@@ -47,6 +48,10 @@ export default {
       return blogImages(request, env);
     }
 
+    if (url.pathname === '/nav-sites') {
+      return navSites(request, env);
+    }
+
     if (url.pathname !== '/skill-tree') {
       return json({ ok: false, error: 'NOT_FOUND' }, request, env, 404);
     }
@@ -86,6 +91,51 @@ export default {
     return json({ ok: false, error: 'METHOD_NOT_ALLOWED' }, request, env, 405);
   }
 };
+
+async function navSites(request, env) {
+  if (!env.SKILL_TREE_KV) {
+    return json({ ok: false, error: 'KV_NOT_CONFIGURED' }, request, env, 500);
+  }
+
+  const authResult = authorize(request, env);
+  if (!authResult.ok) {
+    return json({ ok: false, error: authResult.error }, request, env, authResult.status);
+  }
+
+  if (request.method === 'GET') {
+    const raw = await env.SKILL_TREE_KV.get(NAV_SITES_KEY);
+    if (!raw) {
+      return json({ ok: true, version: 1, updatedAt: '', sites: [] }, request, env);
+    }
+
+    try {
+      const payload = normalizeNavSites(JSON.parse(raw));
+      return json({ ok: true, ...payload }, request, env);
+    } catch (error) {
+      return json({ ok: false, error: 'NAV_DATA_INVALID' }, request, env, 500);
+    }
+  }
+
+  if (request.method === 'PUT' || request.method === 'POST' || request.method === 'PATCH') {
+    let payload;
+    try {
+      payload = normalizeNavSites(await readJsonBody(request));
+    } catch (error) {
+      return json({ ok: false, error: error.message || 'INVALID_REQUEST' }, request, env, 400);
+    }
+
+    payload.updatedAt = new Date().toISOString();
+    await env.SKILL_TREE_KV.put(NAV_SITES_KEY, JSON.stringify(payload));
+    return json({ ok: true, ...payload }, request, env);
+  }
+
+  if (request.method === 'DELETE') {
+    await env.SKILL_TREE_KV.delete(NAV_SITES_KEY);
+    return json({ ok: true, version: 1, updatedAt: new Date().toISOString(), sites: [] }, request, env);
+  }
+
+  return json({ ok: false, error: 'METHOD_NOT_ALLOWED' }, request, env, 405);
+}
 
 function authorize(request, env) {
   const expected = String(env.ADMIN_TOKEN || '').trim();
@@ -1389,6 +1439,102 @@ function normalizeDomains(input) {
       color: /^#[0-9a-f]{6}$/i.test(domain.color || '') ? domain.color : fallbackDomain.color
     };
   });
+}
+
+function normalizeNavSites(input) {
+  const rawSites = Array.isArray(input)
+    ? input
+    : (Array.isArray(input && input.sites) ? input.sites : []);
+  const usedIds = new Set();
+  const sites = rawSites
+    .map((site, index) => normalizeNavSite(site, index, usedIds))
+    .filter(Boolean);
+
+  return {
+    version: 1,
+    updatedAt: trimText(input && input.updatedAt, 40),
+    sites
+  };
+}
+
+function normalizeNavSite(input, index, usedIds) {
+  if (!input || typeof input !== 'object') return null;
+
+  const url = normalizeNavUrl(input.url);
+  if (!url) return null;
+
+  const host = navHostname(url);
+  let id = trimText(input.id, 90) || `site-${index + 1}`;
+  if (usedIds.has(id)) id = `${id}-${index + 1}`;
+  usedIds.add(id);
+
+  const iconType = normalizeNavIconType(input.iconType, input.icon);
+  const icon = normalizeNavIcon(input.icon, iconType);
+
+  return {
+    id,
+    title: trimText(input.title || input.name, 80) || host || `收藏 ${index + 1}`,
+    url,
+    iconType,
+    icon,
+    color: /^#[0-9a-f]{6}$/i.test(input.color || '') ? input.color : navColorForText(host || id),
+    group: trimText(input.group || input.category, 40),
+    note: trimText(input.note || input.description, 180),
+    pinned: Boolean(input.pinned),
+    createdAt: trimText(input.createdAt, 40),
+    updatedAt: trimText(input.updatedAt, 40)
+  };
+}
+
+function normalizeNavUrl(value) {
+  let text = trimText(value, 1000);
+  if (!text) return '';
+  if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(text)) {
+    text = `https://${text}`;
+  }
+
+  try {
+    const url = new URL(text);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return '';
+    return url.toString();
+  } catch (error) {
+    return '';
+  }
+}
+
+function normalizeNavIconType(value, icon) {
+  const type = trimText(value, 20);
+  if (['favicon', 'image', 'emoji', 'letter', 'color'].includes(type)) return type;
+  const text = trimText(icon, 500);
+  if (/^https?:\/\//i.test(text)) return 'image';
+  if (text) return 'emoji';
+  return 'favicon';
+}
+
+function normalizeNavIcon(value, iconType) {
+  const icon = trimText(value, iconType === 'image' ? 1000 : 16);
+  if (iconType === 'image') return /^https?:\/\//i.test(icon) ? icon : '';
+  if (iconType === 'letter') return icon.slice(0, 2);
+  if (iconType === 'color') return '';
+  return icon.slice(0, 4);
+}
+
+function navHostname(url) {
+  try {
+    return new URL(url).hostname.replace(/^www\./i, '');
+  } catch (error) {
+    return '';
+  }
+}
+
+function navColorForText(value) {
+  const palette = ['#4285f4', '#34a853', '#fbbc05', '#ea4335', '#7c5cff', '#00a3a3', '#ff7aa2', '#5d6d7e'];
+  const text = String(value || '');
+  let hash = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    hash = (hash * 31 + text.charCodeAt(index)) >>> 0;
+  }
+  return palette[hash % palette.length];
 }
 
 function normalizeTree(input) {
