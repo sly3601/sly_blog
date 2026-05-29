@@ -456,6 +456,7 @@
 
       let sourceIndex = 0;
       const img = document.createElement('img');
+      img.className = 'nav-site-img no-lightbox';
       img.alt = '';
       img.decoding = 'async';
       img.loading = 'lazy';
@@ -626,6 +627,7 @@
 
     const bareHost = host.replace(/^www\./i, '');
     return unique([
+      `https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=${encodeURIComponent(origin || url)}&size=128`,
       `https://www.google.com/s2/favicons?domain=${encodeURIComponent(bareHost)}&sz=128`,
       `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=128`,
       `https://www.google.com/s2/favicons?domain_url=${encodeURIComponent(origin || url)}&sz=128`,

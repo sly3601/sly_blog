@@ -10,7 +10,7 @@ robots: noindex,nofollow
 ---
 
 {% raw %}
-<link rel="stylesheet" href="/sly_blog/css/navigator.css?v=20260530-nav3">
+<link rel="stylesheet" href="/sly_blog/css/navigator.css?v=20260530-nav4">
 
 <div id="navigator-app" class="navigator-app" data-api-endpoint="https://sly-skill-tree-api-pages.pages.dev">
   <section id="navLock" class="nav-lock-screen" aria-label="私人导航解锁">
@@ -155,5 +155,5 @@ robots: noindex,nofollow
     document.head.appendChild(meta);
   })();
 </script>
-<script defer src="/sly_blog/js/navigator.js?v=20260530-nav3"></script>
+<script defer src="/sly_blog/js/navigator.js?v=20260530-nav4"></script>
 {% endraw %}

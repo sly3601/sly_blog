@@ -398,11 +398,22 @@ body.navigator-page #page .page-title {
     inset 0 1px 0 rgba(255, 255, 255, 0.68);
 }
 
-.nav-site-icon img {
-  display: block;
-  width: 68%;
-  height: 68%;
+.nav-site-icon img,
+#article-container .nav-site-icon img {
+  display: block !important;
+  align-self: center;
+  justify-self: center;
+  width: 36px !important;
+  height: 36px !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
   object-fit: contain;
+  object-position: center;
+  vertical-align: middle;
 }
 
 .nav-site-icon.is-text-icon {
@@ -753,6 +764,12 @@ body.navigator-page #page .page-title {
     width: 48px;
     height: 48px;
     border-radius: 14px;
+  }
+
+  .nav-site-icon img,
+  #article-container .nav-site-icon img {
+    width: 32px !important;
+    height: 32px !important;
   }
 
   .nav-card-actions {
