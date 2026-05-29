@@ -415,12 +415,14 @@ body.navigator-page #page .page-title {
   min-height: 34px;
   margin: 0;
   overflow: hidden;
-  color: var(--nav-text);
+  color: #fff;
   font-size: 0.85rem;
   font-weight: 800;
   line-height: 1.25;
   text-overflow: ellipsis;
-  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.42);
+  text-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.62),
+    0 0 1px rgba(0, 0, 0, 0.76);
   word-break: break-word;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -431,9 +433,10 @@ body.navigator-page #page .page-title {
   width: 100%;
   margin: 4px 0 0;
   overflow: hidden;
-  color: var(--nav-muted);
+  color: rgba(255, 255, 255, 0.78);
   font-size: 0.72rem;
   line-height: 1.25;
+  text-shadow: 0 2px 7px rgba(0, 0, 0, 0.58);
   -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
 }
