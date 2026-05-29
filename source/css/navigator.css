@@ -386,16 +386,14 @@ body.navigator-page #page .page-title {
   width: 54px;
   height: 54px;
   margin-bottom: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.74);
+  border: 1px solid transparent;
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.86);
+  background: transparent;
   color: #fff;
   overflow: hidden;
   font-size: 1.35rem;
   font-weight: 900;
-  box-shadow:
-    0 10px 22px rgba(16, 24, 40, 0.14),
-    inset 0 1px 0 rgba(255, 255, 255, 0.68);
+  box-shadow: none;
 }
 
 .nav-site-icon img,
@@ -403,8 +401,8 @@ body.navigator-page #page .page-title {
   display: block !important;
   align-self: center;
   justify-self: center;
-  width: 36px !important;
-  height: 36px !important;
+  width: 42px !important;
+  height: 42px !important;
   max-width: none !important;
   margin: 0 !important;
   padding: 0 !important;
@@ -418,6 +416,7 @@ body.navigator-page #page .page-title {
 
 .nav-site-icon.is-text-icon {
   border-color: rgba(0, 0, 0, 0.05);
+  box-shadow: 0 10px 22px rgba(16, 24, 40, 0.14);
 }
 
 .nav-site-title {
@@ -479,8 +478,10 @@ body.navigator-page #page .page-title {
 
 .nav-add-card .nav-site-icon {
   border-style: dashed;
-  background: rgba(255, 255, 255, 0.66);
+  border-color: rgba(255, 255, 255, 0.36);
+  background: rgba(255, 255, 255, 0.18);
   color: var(--nav-accent);
+  backdrop-filter: blur(10px);
 }
 
 .nav-empty-card {
@@ -680,7 +681,7 @@ body.navigator-page #page .page-title {
 }
 
 [data-theme="dark"] .nav-site-icon {
-  background: rgba(255, 255, 255, 0.88);
+  background: transparent;
 }
 
 [data-theme="dark"] .nav-site-icon.is-text-icon {
@@ -768,8 +769,8 @@ body.navigator-page #page .page-title {
 
   .nav-site-icon img,
   #article-container .nav-site-icon img {
-    width: 32px !important;
-    height: 32px !important;
+    width: 38px !important;
+    height: 38px !important;
   }
 
   .nav-card-actions {

@@ -444,7 +444,7 @@
   function renderIcon(host, site) {
     host.innerHTML = '';
     host.classList.remove('is-favicon-icon', 'is-image-icon', 'is-text-icon');
-    host.style.backgroundColor = site.iconType === 'favicon' || site.iconType === 'image' ? '#fff' : site.color;
+    host.style.backgroundColor = site.iconType === 'favicon' || site.iconType === 'image' ? 'transparent' : site.color;
     host.style.color = readableTextColor(site.color);
 
     if (site.iconType === 'favicon' || site.iconType === 'image') {
@@ -627,6 +627,7 @@
 
     const bareHost = host.replace(/^www\./i, '');
     return unique([
+      ...brandIconUrls(bareHost),
       `https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=${encodeURIComponent(origin || url)}&size=128`,
       `https://www.google.com/s2/favicons?domain=${encodeURIComponent(bareHost)}&sz=128`,
       `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=128`,
@@ -634,6 +635,25 @@
       `https://icons.duckduckgo.com/ip3/${encodeURIComponent(host)}.ico`,
       origin ? `${origin}/favicon.ico` : ''
     ].filter(Boolean));
+  }
+
+  function brandIconUrls(host) {
+    const normalizedHost = String(host || '').toLowerCase();
+    if (normalizedHost === 'bilibili.com' || normalizedHost.endsWith('.bilibili.com')) {
+      return [svgDataUrl(`
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+          <path d="M22.7 19.8 16.9 14l3-3 6.8 6.7h10.6l6.8-6.7 3 3-5.8 5.8c4.9.8 7.9 4.4 7.9 9.6v12c0 6.3-4.1 10-11 10H25.8c-6.9 0-11-3.7-11-10v-12c0-5.2 3-8.8 7.9-9.6Z" fill="none" stroke="#13b5e9" stroke-width="5.2" stroke-linejoin="round"/>
+          <circle cx="25.2" cy="35" r="2.7" fill="#13b5e9"/>
+          <circle cx="38.8" cy="35" r="2.7" fill="#13b5e9"/>
+          <path d="M27 43.3h10" stroke="#13b5e9" stroke-width="4.3" stroke-linecap="round"/>
+        </svg>
+      `)];
+    }
+    return [];
+  }
+
+  function svgDataUrl(svg) {
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg.replace(/\s+/g, ' ').trim())}`;
   }
 
   function originFromUrl(url) {
