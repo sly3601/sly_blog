@@ -15,8 +15,8 @@ robots: noindex,nofollow
 <div id="navigator-app" class="navigator-app" data-api-endpoint="https://sly-skill-tree-api-pages.pages.dev">
   <section id="navLock" class="nav-lock-screen" aria-label="私人导航解锁">
     <div class="nav-lock-panel">
-      <div class="nav-lock-brand" aria-hidden="true">
-        <span>S</span><span>l</span><span>y</span><span>N</span><span>a</span><span>v</span>
+      <div class="nav-lock-mark" aria-hidden="true">
+        <i class="fas fa-lock"></i>
       </div>
       <h1>私人导航</h1>
       <form id="navUnlockForm" class="nav-unlock-form">
@@ -48,10 +48,6 @@ robots: noindex,nofollow
     </header>
 
     <main class="nav-home">
-      <div class="nav-logo" aria-label="Sly Nav">
-        <span>S</span><span>l</span><span>y</span><span>N</span><span>a</span><span>v</span>
-      </div>
-
       <form id="navSearchForm" class="nav-search-form">
         <i class="fas fa-search" aria-hidden="true"></i>
         <input id="navSearchInput" type="search" autocomplete="off" spellcheck="false" placeholder="搜索或输入网址">

@@ -443,15 +443,33 @@
 
   function renderIcon(host, site) {
     host.innerHTML = '';
+    host.classList.remove('is-favicon-icon', 'is-image-icon', 'is-text-icon');
     host.style.backgroundColor = site.iconType === 'favicon' || site.iconType === 'image' ? '#fff' : site.color;
     host.style.color = readableTextColor(site.color);
 
     if (site.iconType === 'favicon' || site.iconType === 'image') {
+      const sources = site.iconType === 'image' && site.icon ? [site.icon] : faviconUrls(site.url);
+      if (!sources.length) {
+        renderTextIcon(host, site);
+        return;
+      }
+
+      let sourceIndex = 0;
       const img = document.createElement('img');
       img.alt = '';
+      img.decoding = 'async';
+      img.loading = 'lazy';
       img.referrerPolicy = 'no-referrer';
-      img.src = site.iconType === 'image' && site.icon ? site.icon : faviconUrl(site.url);
-      img.addEventListener('error', () => renderTextIcon(host, site));
+      img.src = sources[sourceIndex];
+      host.classList.add(site.iconType === 'image' ? 'is-image-icon' : 'is-favicon-icon');
+      img.addEventListener('error', () => {
+        sourceIndex += 1;
+        if (sources[sourceIndex]) {
+          img.src = sources[sourceIndex];
+          return;
+        }
+        renderTextIcon(host, site);
+      });
       host.appendChild(img);
       return;
     }
@@ -461,6 +479,8 @@
 
   function renderTextIcon(host, site) {
     host.innerHTML = '';
+    host.classList.remove('is-favicon-icon', 'is-image-icon');
+    host.classList.add('is-text-icon');
     host.style.backgroundColor = site.color;
     host.style.color = readableTextColor(site.color);
     host.textContent = site.iconType === 'emoji' && site.icon
@@ -599,8 +619,31 @@
     }
   }
 
-  function faviconUrl(url) {
-    return `https://www.google.com/s2/favicons?domain_url=${encodeURIComponent(url)}&sz=96`;
+  function faviconUrls(url) {
+    const host = hostname(url);
+    const origin = originFromUrl(url);
+    if (!host) return [];
+
+    const bareHost = host.replace(/^www\./i, '');
+    return unique([
+      `https://www.google.com/s2/favicons?domain=${encodeURIComponent(bareHost)}&sz=128`,
+      `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=128`,
+      `https://www.google.com/s2/favicons?domain_url=${encodeURIComponent(origin || url)}&sz=128`,
+      `https://icons.duckduckgo.com/ip3/${encodeURIComponent(host)}.ico`,
+      origin ? `${origin}/favicon.ico` : ''
+    ].filter(Boolean));
+  }
+
+  function originFromUrl(url) {
+    try {
+      return new URL(url).origin;
+    } catch (error) {
+      return '';
+    }
+  }
+
+  function unique(items) {
+    return [...new Set(items)];
   }
 
   function initials(value) {
