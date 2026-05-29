@@ -352,6 +352,10 @@ body.navigator-page #page .page-title {
   margin: 0 auto 18px;
 }
 
+.nav-group-tabs[hidden] {
+  display: none;
+}
+
 .nav-group-tab {
   min-height: 34px;
   padding: 0 13px;
@@ -440,8 +444,9 @@ body.navigator-page #page .page-title {
   margin: 0 !important;
   padding: 0 !important;
   border: 0 !important;
-  border-radius: 0 !important;
+  border-radius: 10px !important;
   box-shadow: none !important;
+  mix-blend-mode: multiply;
   object-fit: contain;
   object-position: center;
   vertical-align: middle;
