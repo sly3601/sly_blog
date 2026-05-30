@@ -67,6 +67,8 @@
   let iconCache = loadIconCache();
 
   function init() {
+    injectNavigatorStyleOverrides();
+
     els.endpoint.value = storedValue(ENDPOINT_FALLBACK_KEYS) || app.dataset.apiEndpoint || '';
     els.token.value = storedValue(TOKEN_FALLBACK_KEYS);
     bindEvents();
@@ -75,6 +77,90 @@
     if (els.endpoint.value.trim() && els.token.value.trim()) {
       unlock({ silent: true });
     }
+  }
+
+  // v2.6修改：去掉底部“添加网站”卡片后，只保留右下角 FAB；
+  // 同时把 FAB 改成更小的玻璃拟态按钮。
+  function injectNavigatorStyleOverrides() {
+    const styleId = 'navigator-v2-6-style-overrides';
+    if (document.getElementById(styleId)) return;
+
+    const style = document.createElement('style');
+    style.id = styleId;
+    style.textContent = `
+      .navigator-page #navFabAdd {
+        width: 46px !important;
+        height: 46px !important;
+        min-width: 46px !important;
+        min-height: 46px !important;
+        border-radius: 999px !important;
+        border: 1px solid rgba(255, 255, 255, 0.42) !important;
+        background:
+          linear-gradient(135deg, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.16)) !important;
+        color: rgba(37, 99, 235, 0.92) !important;
+        box-shadow:
+          0 14px 36px rgba(15, 23, 42, 0.16),
+          inset 0 1px 0 rgba(255, 255, 255, 0.72),
+          inset 0 -1px 0 rgba(255, 255, 255, 0.18) !important;
+        backdrop-filter: blur(18px) saturate(1.35) !important;
+        -webkit-backdrop-filter: blur(18px) saturate(1.35) !important;
+        opacity: 0.88 !important;
+        transform: translateZ(0) !important;
+        transition:
+          transform 180ms ease,
+          opacity 180ms ease,
+          box-shadow 180ms ease,
+          background 180ms ease !important;
+      }
+
+      .navigator-page #navFabAdd:hover {
+        opacity: 1 !important;
+        transform: translateY(-2px) scale(1.035) !important;
+        background:
+          linear-gradient(135deg, rgba(255, 255, 255, 0.58), rgba(255, 255, 255, 0.22)) !important;
+        box-shadow:
+          0 18px 42px rgba(15, 23, 42, 0.20),
+          inset 0 1px 0 rgba(255, 255, 255, 0.82),
+          inset 0 -1px 0 rgba(255, 255, 255, 0.22) !important;
+      }
+
+      .navigator-page #navFabAdd:active {
+        transform: translateY(0) scale(0.97) !important;
+        opacity: 0.96 !important;
+      }
+
+      .navigator-page #navFabAdd i,
+      .navigator-page #navFabAdd svg {
+        font-size: 18px !important;
+        width: 18px !important;
+        height: 18px !important;
+        line-height: 1 !important;
+      }
+
+      .navigator-page #navFabAdd::before,
+      .navigator-page #navFabAdd::after {
+        box-shadow: none !important;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        .navigator-page #navFabAdd {
+          border-color: rgba(255, 255, 255, 0.18) !important;
+          background:
+            linear-gradient(135deg, rgba(30, 41, 59, 0.62), rgba(15, 23, 42, 0.34)) !important;
+          color: rgba(147, 197, 253, 0.96) !important;
+          box-shadow:
+            0 14px 36px rgba(0, 0, 0, 0.28),
+            inset 0 1px 0 rgba(255, 255, 255, 0.20),
+            inset 0 -1px 0 rgba(255, 255, 255, 0.08) !important;
+        }
+
+        .navigator-page #navFabAdd:hover {
+          background:
+            linear-gradient(135deg, rgba(51, 65, 85, 0.72), rgba(15, 23, 42, 0.42)) !important;
+        }
+      }
+    `;
+    document.head.appendChild(style);
   }
 
   function bindEvents() {
@@ -211,7 +297,8 @@
       visibleSites.forEach((site) => els.grid.appendChild(siteCard(site)));
     }
 
-    els.grid.appendChild(addCard());
+    // v2.6修改：删除收藏列表最后的“添加网站”卡片。
+    // 现在只使用右下角玻璃风格加号按钮添加网站。
   }
 
   function siteCard(site) {
@@ -270,11 +357,7 @@
     icon.className = 'nav-site-icon';
     icon.innerHTML = '<i class="fas fa-plus"></i>';
 
-    const title = document.createElement('p');
-    title.className = 'nav-site-title';
-    title.textContent = '添加网站';
-
-    card.append(icon, title);
+    card.append(icon);
     return card;
   }
 
