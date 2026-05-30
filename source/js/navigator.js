@@ -634,13 +634,31 @@
     const bareHost = host.replace(/^www\./i, '');
     return unique([
       ...brandIconUrls(host),
+      ...siteIconUrls(url, bareHost, origin),
+      `https://icons.duckduckgo.com/ip3/${encodeURIComponent(host)}.ico`,
+      `https://icons.duckduckgo.com/ip3/${encodeURIComponent(bareHost)}.ico`,
+      `https://icon.horse/icon/${encodeURIComponent(host)}`,
+      `https://unavatar.io/${encodeURIComponent(host)}`,
       `https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=${encodeURIComponent(origin || url)}&size=128`,
       `https://www.google.com/s2/favicons?domain=${encodeURIComponent(bareHost)}&sz=128`,
       `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=128`,
-      `https://www.google.com/s2/favicons?domain_url=${encodeURIComponent(origin || url)}&sz=128`,
-      `https://icons.duckduckgo.com/ip3/${encodeURIComponent(host)}.ico`,
-      origin ? `${origin}/favicon.ico` : ''
+      `https://www.google.com/s2/favicons?domain_url=${encodeURIComponent(origin || url)}&sz=128`
     ].filter(Boolean));
+  }
+
+  function siteIconUrls(url, bareHost, origin) {
+    const origins = unique([
+      origin,
+      bareHost ? `https://${bareHost}` : '',
+      bareHost ? `http://${bareHost}` : ''
+    ].filter(Boolean));
+
+    return origins.flatMap((item) => [
+      `${item}/favicon.ico`,
+      `${item}/favicon.png`,
+      `${item}/apple-touch-icon.png`,
+      `${item}/apple-touch-icon-precomposed.png`
+    ]);
   }
 
   function brandIconUrls(host) {
