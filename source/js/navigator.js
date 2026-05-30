@@ -13,7 +13,6 @@
   ];
   const CACHE_KEY = 'sly_blog_navigator_cache_v1';
 
-  // v2.4修改：favicon 成功源缓存，避免每次刷新都重新试一堆第三方源
   const ICON_CACHE_KEY = 'sly_blog_navigator_icon_cache_v1';
   const ICON_TIMEOUT_MS = 2500;
 
@@ -64,8 +63,6 @@
   let activeGroup = ALL_GROUP;
   let toastTimer;
   let lastFocusedElement = null;
-
-  // v2.4修改：读取 icon 缓存
   let iconCache = loadIconCache();
 
   function init() {
@@ -465,15 +462,23 @@
     host.style.color = readableTextColor(site.color);
 
     if (site.iconType === 'favicon' || site.iconType === 'image') {
+      const hostName = hostname(site.url);
       const cacheKey = site.iconType === 'favicon' ? faviconCacheKey(site.url) : '';
       const cachedIcon = cacheKey ? iconCache[cacheKey] : '';
 
-      const sources = site.iconType === 'image' && site.icon
+      const brandSources = site.iconType === 'favicon'
+        ? brandIconUrls(hostName)
+        : [];
+
+      const normalSources = site.iconType === 'image' && site.icon
         ? [site.icon]
         : unique([
+            ...brandSources,
             cachedIcon,
             ...faviconUrls(site.url)
           ].filter(Boolean));
+
+      const sources = normalSources;
 
       if (!sources.length) {
         renderTextIcon(host, site);
@@ -488,10 +493,7 @@
       img.className = 'nav-site-img no-lightbox';
       img.alt = '';
       img.decoding = 'async';
-
-      // v2.4修改：收藏页 icon 很小但很关键，不要 lazy，否则会出现加载时机不稳定
       img.loading = 'eager';
-
       img.referrerPolicy = 'no-referrer';
 
       host.classList.add(site.iconType === 'image' ? 'is-image-icon' : 'is-favicon-icon');
@@ -512,6 +514,7 @@
 
       function saveGoodIconSource(src) {
         if (!cacheKey || !src) return;
+        if (isKnownBrandHost(hostName) && isGoogleFaviconUrl(src)) return;
         if (iconCache[cacheKey] === src) return;
 
         iconCache[cacheKey] = src;
@@ -712,7 +715,6 @@
     }
   }
 
-  // v2.4修改：稳定源优先。不要先跑 SimpleIcons/Iconify。
   function faviconUrls(url) {
     const host = hostname(url);
     const origin = originFromUrl(url);
@@ -721,24 +723,77 @@
     const bareHost = host.replace(/^www\./i, '');
 
     return unique([
-      // 最稳定，优先
       `https://www.google.com/s2/favicons?domain=${encodeURIComponent(bareHost)}&sz=128`,
       `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=128`,
       `https://www.google.com/s2/favicons?domain_url=${encodeURIComponent(origin || url)}&sz=128`,
       `https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=${encodeURIComponent(origin || url)}&size=128`,
 
-      // 目标网站自己的图标
       origin ? `${origin}/favicon.ico` : '',
       origin ? `${origin}/favicon.png` : '',
       origin ? `${origin}/apple-touch-icon.png` : '',
       origin ? `${origin}/apple-touch-icon-precomposed.png` : '',
 
-      // 备用第三方源
       `https://icons.duckduckgo.com/ip3/${encodeURIComponent(host)}.ico`,
       `https://icons.duckduckgo.com/ip3/${encodeURIComponent(bareHost)}.ico`,
       `https://icon.horse/icon/${encodeURIComponent(host)}`,
       `https://unavatar.io/${encodeURIComponent(host)}`
     ].filter(Boolean));
+  }
+
+  function brandIconUrls(host) {
+    const normalizedHost = String(host || '').toLowerCase();
+    const labels = brandSlugCandidates(normalizedHost);
+
+    return unique(labels.flatMap((slug) => [
+      `https://cdn.simpleicons.org/${encodeURIComponent(slug)}/111111`,
+      `https://api.iconify.design/simple-icons:${encodeURIComponent(slug)}.svg?color=%23111111`
+    ]));
+  }
+
+  function brandSlugCandidates(host) {
+    const normalized = String(host || '')
+      .toLowerCase()
+      .replace(/^www\./i, '');
+
+    const hostAliases = {
+      'bilibili.com': ['bilibili'],
+      'www.bilibili.com': ['bilibili'],
+      'youtube.com': ['youtube'],
+      'www.youtube.com': ['youtube'],
+      'youtu.be': ['youtube'],
+      'chatgpt.com': ['openai'],
+      'openai.com': ['openai'],
+      'github.com': ['github']
+    };
+
+    if (hostAliases[normalized]) return hostAliases[normalized];
+
+    const base = normalized
+      .split('.')
+      .filter((part) => !['com', 'cn', 'net', 'org', 'io', 'ai', 'app', 'dev', 'co'].includes(part))[0] || '';
+
+    const compact = base.replace(/[^a-z0-9]/g, '');
+
+    const aliases = {
+      chatgpt: ['openai'],
+      openai: ['openai'],
+      youtube: ['youtube'],
+      youtu: ['youtube'],
+      bilibili: ['bilibili'],
+      github: ['github']
+    };
+
+    if (aliases[compact]) return aliases[compact];
+
+    return [];
+  }
+
+  function isKnownBrandHost(host) {
+    return brandSlugCandidates(host).length > 0;
+  }
+
+  function isGoogleFaviconUrl(src) {
+    return /(^https:\/\/www\.google\.com\/s2\/favicons)|(^https:\/\/t2\.gstatic\.com\/faviconV2)/i.test(String(src || ''));
   }
 
   function faviconCacheKey(url) {
@@ -760,7 +815,6 @@
     try {
       localStorage.setItem(ICON_CACHE_KEY, JSON.stringify(iconCache));
     } catch (error) {
-      // localStorage 满了就清空 icon 缓存，不影响主功能
       iconCache = {};
       localStorage.removeItem(ICON_CACHE_KEY);
     }
@@ -779,31 +833,6 @@
       `${item}/apple-touch-icon.png`,
       `${item}/apple-touch-icon-precomposed.png`
     ]);
-  }
-
-  function brandIconUrls(host) {
-    const normalizedHost = String(host || '').toLowerCase();
-    const labels = brandSlugCandidates(normalizedHost);
-    return unique(labels.flatMap((slug) => [
-      `https://cdn.simpleicons.org/${encodeURIComponent(slug)}`,
-      `https://api.iconify.design/simple-icons:${encodeURIComponent(slug)}.svg?color=%23111111`
-    ]));
-  }
-
-  function brandSlugCandidates(host) {
-    const base = host
-      .replace(/^www\./i, '')
-      .split('.')
-      .filter((part) => !['com', 'cn', 'net', 'org', 'io', 'ai', 'app', 'dev', 'co'].includes(part))[0] || '';
-    const compact = base.replace(/[^a-z0-9]/g, '');
-    const aliases = {
-      chatgpt: ['openai'],
-      openai: ['openai'],
-      youtube: ['youtube'],
-      youtu: ['youtube'],
-      bilibili: ['bilibili']
-    };
-    return unique([...(aliases[compact] || []), compact].filter(Boolean));
   }
 
   function svgDataUrl(svg) {
