@@ -12,6 +12,11 @@
     'sly_blog_post_editor_endpoint'
   ];
   const CACHE_KEY = 'sly_blog_navigator_cache_v1';
+
+  // v2.4修改：favicon 成功源缓存，避免每次刷新都重新试一堆第三方源
+  const ICON_CACHE_KEY = 'sly_blog_navigator_icon_cache_v1';
+  const ICON_TIMEOUT_MS = 2500;
+
   const ALL_GROUP = '__all__';
   const PINNED_GROUP = '__pinned__';
 
@@ -59,6 +64,9 @@
   let activeGroup = ALL_GROUP;
   let toastTimer;
   let lastFocusedElement = null;
+
+  // v2.4修改：读取 icon 缓存
+  let iconCache = loadIconCache();
 
   function init() {
     els.endpoint.value = storedValue(ENDPOINT_FALLBACK_KEYS) || app.dataset.apiEndpoint || '';
@@ -345,6 +353,7 @@
     const id = els.editingId.value || createId();
     const title = els.siteTitle.value.trim() || hostname(url) || '未命名网站';
     const iconType = els.iconType.value;
+
     return normalizeSite({
       id,
       title,
@@ -446,38 +455,107 @@
   function renderIcon(host, site) {
     host.innerHTML = '';
     host.classList.remove('is-favicon-icon', 'is-image-icon', 'is-text-icon');
+
     if (site.iconType === 'favicon' || site.iconType === 'image') {
       host.style.removeProperty('background-color');
     } else {
       host.style.backgroundColor = site.color;
     }
+
     host.style.color = readableTextColor(site.color);
 
     if (site.iconType === 'favicon' || site.iconType === 'image') {
-      const sources = site.iconType === 'image' && site.icon ? [site.icon] : faviconUrls(site.url);
+      const cacheKey = site.iconType === 'favicon' ? faviconCacheKey(site.url) : '';
+      const cachedIcon = cacheKey ? iconCache[cacheKey] : '';
+
+      const sources = site.iconType === 'image' && site.icon
+        ? [site.icon]
+        : unique([
+            cachedIcon,
+            ...faviconUrls(site.url)
+          ].filter(Boolean));
+
       if (!sources.length) {
         renderTextIcon(host, site);
         return;
       }
 
       let sourceIndex = 0;
+      let timeoutTimer = null;
+      let finished = false;
+
       const img = document.createElement('img');
       img.className = 'nav-site-img no-lightbox';
       img.alt = '';
       img.decoding = 'async';
-      img.loading = 'lazy';
+
+      // v2.4修改：收藏页 icon 很小但很关键，不要 lazy，否则会出现加载时机不稳定
+      img.loading = 'eager';
+
       img.referrerPolicy = 'no-referrer';
-      img.src = sources[sourceIndex];
+
       host.classList.add(site.iconType === 'image' ? 'is-image-icon' : 'is-favicon-icon');
-      img.addEventListener('error', () => {
+
+      function clearIconTimer() {
+        if (timeoutTimer) {
+          clearTimeout(timeoutTimer);
+          timeoutTimer = null;
+        }
+      }
+
+      function finishAsTextIcon() {
+        if (finished) return;
+        finished = true;
+        clearIconTimer();
+        renderTextIcon(host, site);
+      }
+
+      function saveGoodIconSource(src) {
+        if (!cacheKey || !src) return;
+        if (iconCache[cacheKey] === src) return;
+
+        iconCache[cacheKey] = src;
+        saveIconCache();
+      }
+
+      function tryNextIcon() {
+        if (finished) return;
+
+        clearIconTimer();
         sourceIndex += 1;
+
         if (sources[sourceIndex]) {
-          img.src = sources[sourceIndex];
+          loadIconSource();
           return;
         }
-        renderTextIcon(host, site);
+
+        finishAsTextIcon();
+      }
+
+      function loadIconSource() {
+        if (finished) return;
+
+        clearIconTimer();
+
+        timeoutTimer = setTimeout(() => {
+          tryNextIcon();
+        }, ICON_TIMEOUT_MS);
+
+        img.src = sources[sourceIndex];
+      }
+
+      img.addEventListener('load', () => {
+        if (finished) return;
+        clearIconTimer();
+        saveGoodIconSource(img.currentSrc || img.src);
       });
+
+      img.addEventListener('error', () => {
+        tryNextIcon();
+      });
+
       host.appendChild(img);
+      loadIconSource();
       return;
     }
 
@@ -626,24 +704,66 @@
     }
   }
 
+  function originFromUrl(url) {
+    try {
+      return new URL(url).origin;
+    } catch (error) {
+      return '';
+    }
+  }
+
+  // v2.4修改：稳定源优先。不要先跑 SimpleIcons/Iconify。
   function faviconUrls(url) {
     const host = hostname(url);
     const origin = originFromUrl(url);
     if (!host) return [];
 
     const bareHost = host.replace(/^www\./i, '');
+
     return unique([
-      ...brandIconUrls(host),
-      ...siteIconUrls(url, bareHost, origin),
+      // 最稳定，优先
+      `https://www.google.com/s2/favicons?domain=${encodeURIComponent(bareHost)}&sz=128`,
+      `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=128`,
+      `https://www.google.com/s2/favicons?domain_url=${encodeURIComponent(origin || url)}&sz=128`,
+      `https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=${encodeURIComponent(origin || url)}&size=128`,
+
+      // 目标网站自己的图标
+      origin ? `${origin}/favicon.ico` : '',
+      origin ? `${origin}/favicon.png` : '',
+      origin ? `${origin}/apple-touch-icon.png` : '',
+      origin ? `${origin}/apple-touch-icon-precomposed.png` : '',
+
+      // 备用第三方源
       `https://icons.duckduckgo.com/ip3/${encodeURIComponent(host)}.ico`,
       `https://icons.duckduckgo.com/ip3/${encodeURIComponent(bareHost)}.ico`,
       `https://icon.horse/icon/${encodeURIComponent(host)}`,
-      `https://unavatar.io/${encodeURIComponent(host)}`,
-      `https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=${encodeURIComponent(origin || url)}&size=128`,
-      `https://www.google.com/s2/favicons?domain=${encodeURIComponent(bareHost)}&sz=128`,
-      `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=128`,
-      `https://www.google.com/s2/favicons?domain_url=${encodeURIComponent(origin || url)}&sz=128`
+      `https://unavatar.io/${encodeURIComponent(host)}`
     ].filter(Boolean));
+  }
+
+  function faviconCacheKey(url) {
+    const host = hostname(url);
+    return host ? host.toLowerCase() : '';
+  }
+
+  function loadIconCache() {
+    try {
+      const cache = JSON.parse(localStorage.getItem(ICON_CACHE_KEY) || '{}');
+      return cache && typeof cache === 'object' && !Array.isArray(cache) ? cache : {};
+    } catch (error) {
+      localStorage.removeItem(ICON_CACHE_KEY);
+      return {};
+    }
+  }
+
+  function saveIconCache() {
+    try {
+      localStorage.setItem(ICON_CACHE_KEY, JSON.stringify(iconCache));
+    } catch (error) {
+      // localStorage 满了就清空 icon 缓存，不影响主功能
+      iconCache = {};
+      localStorage.removeItem(ICON_CACHE_KEY);
+    }
   }
 
   function siteIconUrls(url, bareHost, origin) {
@@ -688,14 +808,6 @@
 
   function svgDataUrl(svg) {
     return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg.replace(/\s+/g, ' ').trim())}`;
-  }
-
-  function originFromUrl(url) {
-    try {
-      return new URL(url).origin;
-    } catch (error) {
-      return '';
-    }
   }
 
   function unique(items) {
