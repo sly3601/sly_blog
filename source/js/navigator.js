@@ -13,6 +13,7 @@
   ];
   const CACHE_KEY = 'sly_blog_navigator_cache_v1';
 
+  // v2.5修改：icon 成功源缓存
   const ICON_CACHE_KEY = 'sly_blog_navigator_icon_cache_v1';
   const ICON_TIMEOUT_MS = 2500;
 
@@ -470,15 +471,19 @@
         ? brandIconUrls(hostName)
         : [];
 
-      const normalSources = site.iconType === 'image' && site.icon
+      const sources = site.iconType === 'image' && site.icon
         ? [site.icon]
         : unique([
+            // v2.5修改：所有网站都先尝试 SimpleIcons 彩色品牌 SVG。
+            // 成功就是原来那种干净的品牌图标；失败才进入缓存和 favicon 贴图。
             ...brandSources,
+
+            // v2.5修改：旧缓存可能是 Google 贴图，也可能是之前误存的黑色图。
+            // 放在品牌图标之后，不能压过品牌 SVG。
             cachedIcon,
+
             ...faviconUrls(site.url)
           ].filter(Boolean));
-
-      const sources = normalSources;
 
       if (!sources.length) {
         renderTextIcon(host, site);
@@ -514,7 +519,13 @@
 
       function saveGoodIconSource(src) {
         if (!cacheKey || !src) return;
-        if (isKnownBrandHost(hostName) && isGoogleFaviconUrl(src)) return;
+
+        // v2.5修改：不要把之前黑色强制色的 iconify/simpleicons 缓存下来
+        if (isForcedBlackIconUrl(src)) return;
+
+        // v2.5修改：如果是品牌网站，不让 Google favicon 覆盖品牌 SVG
+        if (brandSources.length && isGoogleFaviconUrl(src)) return;
+
         if (iconCache[cacheKey] === src) return;
 
         iconCache[cacheKey] = src;
@@ -723,6 +734,7 @@
     const bareHost = host.replace(/^www\./i, '');
 
     return unique([
+      // v2.5修改：品牌 SVG 失败后，才使用稳定 favicon 源
       `https://www.google.com/s2/favicons?domain=${encodeURIComponent(bareHost)}&sz=128`,
       `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=128`,
       `https://www.google.com/s2/favicons?domain_url=${encodeURIComponent(origin || url)}&sz=128`,
@@ -741,12 +753,14 @@
   }
 
   function brandIconUrls(host) {
-    const normalizedHost = String(host || '').toLowerCase();
-    const labels = brandSlugCandidates(normalizedHost);
+    const labels = brandSlugCandidates(host);
 
+    // v2.5修改：
+    // 只用 cdn.simpleicons.org/{slug}
+    // 不再使用 iconify 的 color=#111111，也不再使用 simpleicons 的 /111111 强制黑色写法。
+    // SimpleIcons 默认会给品牌色，例如 YouTube 红色、Bilibili 蓝色。
     return unique(labels.flatMap((slug) => [
-      `https://cdn.simpleicons.org/${encodeURIComponent(slug)}/111111`,
-      `https://api.iconify.design/simple-icons:${encodeURIComponent(slug)}.svg?color=%23111111`
+      `https://cdn.simpleicons.org/${encodeURIComponent(slug)}`
     ]));
   }
 
@@ -757,22 +771,35 @@
 
     const hostAliases = {
       'bilibili.com': ['bilibili'],
-      'www.bilibili.com': ['bilibili'],
+      'm.bilibili.com': ['bilibili'],
+      'space.bilibili.com': ['bilibili'],
+      'live.bilibili.com': ['bilibili'],
       'youtube.com': ['youtube'],
-      'www.youtube.com': ['youtube'],
+      'm.youtube.com': ['youtube'],
       'youtu.be': ['youtube'],
+      'music.youtube.com': ['youtubemusic', 'youtube'],
       'chatgpt.com': ['openai'],
       'openai.com': ['openai'],
-      'github.com': ['github']
+      'platform.openai.com': ['openai'],
+      'github.com': ['github'],
+      'gist.github.com': ['github']
     };
 
     if (hostAliases[normalized]) return hostAliases[normalized];
 
-    const base = normalized
-      .split('.')
-      .filter((part) => !['com', 'cn', 'net', 'org', 'io', 'ai', 'app', 'dev', 'co'].includes(part))[0] || '';
+    const parts = normalized.split('.').filter(Boolean);
+    const ignoreParts = new Set([
+      'www', 'm', 'mobile', 'app', 'web', 'mail', 'docs', 'blog',
+      'com', 'cn', 'net', 'org', 'io', 'ai', 'app', 'dev', 'co',
+      'top', 'xyz', 'site', 'me', 'tv', 'cc', 'edu', 'gov'
+    ]);
 
-    const compact = base.replace(/[^a-z0-9]/g, '');
+    const usefulParts = parts.filter((part) => !ignoreParts.has(part));
+    const firstUseful = usefulParts[0] || parts[0] || '';
+    const secondUseful = usefulParts[1] || '';
+
+    const compact = firstUseful.replace(/[^a-z0-9]/g, '');
+    const compact2 = secondUseful.replace(/[^a-z0-9]/g, '');
 
     const aliases = {
       chatgpt: ['openai'],
@@ -780,20 +807,57 @@
       youtube: ['youtube'],
       youtu: ['youtube'],
       bilibili: ['bilibili'],
-      github: ['github']
+      github: ['github'],
+      gitlab: ['gitlab'],
+      gitee: ['gitee'],
+      zhihu: ['zhihu'],
+      juejin: ['juejin'],
+      csdn: ['csdn'],
+      notion: ['notion'],
+      obsidian: ['obsidian'],
+      figma: ['figma'],
+      twitter: ['x'],
+      x: ['x'],
+      reddit: ['reddit'],
+      stackoverflow: ['stackoverflow'],
+      npmjs: ['npm'],
+      npm: ['npm'],
+      docker: ['docker'],
+      dockerhub: ['docker'],
+      cloudflare: ['cloudflare'],
+      vercel: ['vercel'],
+      netlify: ['netlify'],
+      apple: ['apple'],
+      google: ['google'],
+      gmail: ['gmail'],
+      drive: ['googledrive'],
+      baidu: ['baidu'],
+      bing: ['bing'],
+      microsoft: ['microsoft'],
+      vscode: ['visualstudiocode'],
+      code: ['visualstudiocode'],
+      python: ['python'],
+      arxiv: ['arxiv'],
+      overleaf: ['overleaf'],
+      zotero: ['zotero']
     };
 
-    if (aliases[compact]) return aliases[compact];
-
-    return [];
-  }
-
-  function isKnownBrandHost(host) {
-    return brandSlugCandidates(host).length > 0;
+    return unique([
+      ...(aliases[compact] || []),
+      ...(aliases[compact2] || []),
+      compact
+    ].filter(Boolean));
   }
 
   function isGoogleFaviconUrl(src) {
     return /(^https:\/\/www\.google\.com\/s2\/favicons)|(^https:\/\/t2\.gstatic\.com\/faviconV2)/i.test(String(src || ''));
+  }
+
+  function isForcedBlackIconUrl(src) {
+    const text = String(src || '');
+    return /cdn\.simpleicons\.org\/[^/]+\/111111/i.test(text)
+      || /api\.iconify\.design\/simple-icons:.*color=%23111111/i.test(text)
+      || /api\.iconify\.design\/simple-icons:.*color=#111111/i.test(text);
   }
 
   function faviconCacheKey(url) {
@@ -803,8 +867,18 @@
 
   function loadIconCache() {
     try {
-      const cache = JSON.parse(localStorage.getItem(ICON_CACHE_KEY) || '{}');
-      return cache && typeof cache === 'object' && !Array.isArray(cache) ? cache : {};
+      const raw = JSON.parse(localStorage.getItem(ICON_CACHE_KEY) || '{}');
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+
+      // v2.5修改：启动时清理之前保存过的黑色强制图标缓存
+      const cleaned = {};
+      Object.entries(raw).forEach(([key, value]) => {
+        if (typeof value === 'string' && !isForcedBlackIconUrl(value)) {
+          cleaned[key] = value;
+        }
+      });
+
+      return cleaned;
     } catch (error) {
       localStorage.removeItem(ICON_CACHE_KEY);
       return {};
