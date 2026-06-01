@@ -43,6 +43,15 @@ DELETE /nav-sites
 Authorization: Bearer <ADMIN_TOKEN>
 ```
 
+The homepage diary widget uses:
+
+```text
+GET /diary?month=YYYY-MM
+POST /diary
+DELETE /diary?date=YYYY-MM-DD
+Authorization: Bearer <ADMIN_TOKEN> for writes
+```
+
 Image uploads from `/write` use a separate GitHub repository by default. Still images are compressed in the browser before upload:
 
 - Secret: `GITHUB_TOKEN` with repo write permission

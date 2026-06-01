@@ -1,6 +1,9 @@
 const TREE_KEY = 'skill-tree:current';
 const NAV_SITES_KEY = 'navigator:sites';
+const DIARY_KEY = 'diary:entries:v1';
 const MAX_BODY_BYTES = 1024 * 1024;
+const MAX_DIARY_BODY_BYTES = 16 * 1024;
+const MAX_DIARY_CONTENT_LENGTH = 5000;
 const DEFAULT_GITHUB_OWNER = 'sly3601';
 const DEFAULT_GITHUB_REPO = 'sly_blog';
 const DEFAULT_GITHUB_IMAGE_REPO = 'sly_blog_images';
@@ -50,6 +53,10 @@ export default {
 
     if (url.pathname === '/nav-sites') {
       return navSites(request, env);
+    }
+
+    if (url.pathname === '/diary') {
+      return diaryEntries(request, env);
     }
 
     if (url.pathname !== '/skill-tree') {
@@ -135,6 +142,131 @@ async function navSites(request, env) {
   }
 
   return json({ ok: false, error: 'METHOD_NOT_ALLOWED' }, request, env, 405);
+}
+
+async function diaryEntries(request, env) {
+  if (!env.SKILL_TREE_KV) {
+    return json({ ok: false, error: 'KV_NOT_CONFIGURED' }, request, env, 500);
+  }
+
+  const url = new URL(request.url);
+
+  if (request.method === 'GET') {
+    const store = await readDiaryStore(env);
+    const date = sanitizeDiaryDate(url.searchParams.get('date'));
+    if (date) {
+      return json({ ok: true, entry: store.entries[date] || null }, request, env);
+    }
+
+    const month = sanitizeDiaryMonth(url.searchParams.get('month')) || currentDiaryMonth();
+    const entries = Object.values(store.entries)
+      .filter((entry) => entry.date.startsWith(`${month}-`))
+      .sort((a, b) => a.date.localeCompare(b.date));
+    return json({ ok: true, month, entries }, request, env);
+  }
+
+  if (request.method === 'POST' || request.method === 'PUT' || request.method === 'PATCH') {
+    const authResult = authorize(request, env);
+    if (!authResult.ok) {
+      return json({ ok: false, error: authResult.error }, request, env, authResult.status);
+    }
+
+    let entry;
+    try {
+      entry = normalizeDiaryEntry(await readJsonBody(request, MAX_DIARY_BODY_BYTES));
+    } catch (error) {
+      return json({ ok: false, error: error.message || 'INVALID_REQUEST' }, request, env, 400);
+    }
+
+    const store = await readDiaryStore(env);
+    store.entries[entry.date] = entry;
+    store.updatedAt = entry.updatedAt;
+    await env.SKILL_TREE_KV.put(DIARY_KEY, JSON.stringify(store));
+    return json({ ok: true, entry }, request, env);
+  }
+
+  if (request.method === 'DELETE') {
+    const authResult = authorize(request, env);
+    if (!authResult.ok) {
+      return json({ ok: false, error: authResult.error }, request, env, authResult.status);
+    }
+
+    const date = sanitizeDiaryDate(url.searchParams.get('date'));
+    if (!date) return json({ ok: false, error: 'INVALID_DATE' }, request, env, 400);
+
+    const store = await readDiaryStore(env);
+    delete store.entries[date];
+    store.updatedAt = new Date().toISOString();
+    await env.SKILL_TREE_KV.put(DIARY_KEY, JSON.stringify(store));
+    return json({ ok: true, date }, request, env);
+  }
+
+  return json({ ok: false, error: 'METHOD_NOT_ALLOWED' }, request, env, 405);
+}
+
+async function readDiaryStore(env) {
+  const raw = await env.SKILL_TREE_KV.get(DIARY_KEY);
+  if (!raw) return { version: 1, updatedAt: '', entries: {} };
+
+  try {
+    const parsed = JSON.parse(raw);
+    const entries = parsed && typeof parsed.entries === 'object' && parsed.entries ? parsed.entries : {};
+    return {
+      version: 1,
+      updatedAt: trimText(parsed && parsed.updatedAt, 40),
+      entries: normalizeDiaryEntries(entries)
+    };
+  } catch (error) {
+    return { version: 1, updatedAt: '', entries: {} };
+  }
+}
+
+function normalizeDiaryEntries(entries) {
+  return Object.values(entries || {}).reduce((result, item) => {
+    const date = sanitizeDiaryDate(item && item.date);
+    const content = trimText(item && item.content, MAX_DIARY_CONTENT_LENGTH);
+    if (!date || !content) return result;
+    result[date] = {
+      date,
+      content,
+      updatedAt: trimText(item && item.updatedAt, 40)
+    };
+    return result;
+  }, {});
+}
+
+function normalizeDiaryEntry(input) {
+  const date = sanitizeDiaryDate(input && input.date);
+  const content = trimText(input && input.content, MAX_DIARY_CONTENT_LENGTH);
+  if (!date) throw new Error('INVALID_DATE');
+  if (!content) throw new Error('BODY_REQUIRED');
+  return {
+    date,
+    content,
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function sanitizeDiaryDate(value) {
+  const text = trimText(value, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return '';
+  const date = new Date(`${text}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return '';
+  const normalized = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
+  return normalized === text ? text : '';
+}
+
+function sanitizeDiaryMonth(value) {
+  const text = trimText(value, 7);
+  if (!/^\d{4}-\d{2}$/.test(text)) return '';
+  const [year, month] = text.split('-').map(Number);
+  if (year < 1970 || year > 3000 || month < 1 || month > 12) return '';
+  return text;
+}
+
+function currentDiaryMonth() {
+  const now = new Date();
+  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
 function authorize(request, env) {
