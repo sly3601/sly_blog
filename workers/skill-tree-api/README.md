@@ -14,9 +14,9 @@ Cloudflare Worker + KV API for the blog skill tree.
 - `GET /nav-sites`: read private navigation bookmarks. Requires `Authorization: Bearer <ADMIN_TOKEN>`.
 - `PUT /nav-sites`: replace private navigation bookmarks. Requires `Authorization: Bearer <ADMIN_TOKEN>`.
 - `DELETE /nav-sites`: clear private navigation bookmarks. Requires `Authorization: Bearer <ADMIN_TOKEN>`.
-- `GET /diary?month=YYYY-MM`: read public diary entries for one month.
-- `POST /diary`: create or update one diary entry. Requires `Authorization: Bearer <ADMIN_TOKEN>`.
-- `DELETE /diary?date=YYYY-MM-DD`: delete one diary entry. Requires `Authorization: Bearer <ADMIN_TOKEN>`.
+- `GET /diary?month=YYYY-MM`: read diary Markdown files from GitHub under `source/_diary/`.
+- `POST /diary`: create or update `source/_diary/YYYY-MM-DD.md` in GitHub. Requires `Authorization: Bearer <ADMIN_TOKEN>`.
+- `DELETE /diary?date=YYYY-MM-DD`: delete one GitHub diary file. Requires `Authorization: Bearer <ADMIN_TOKEN>`.
 - `GET /health`: health check.
 
 ## Image Upload

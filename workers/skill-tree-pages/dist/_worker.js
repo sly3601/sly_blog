@@ -1,6 +1,5 @@
 const TREE_KEY = 'skill-tree:current';
 const NAV_SITES_KEY = 'navigator:sites';
-const DIARY_KEY = 'diary:entries:v1';
 const MAX_BODY_BYTES = 1024 * 1024;
 const MAX_DIARY_BODY_BYTES = 16 * 1024;
 const MAX_DIARY_CONTENT_LENGTH = 5000;
@@ -9,6 +8,7 @@ const DEFAULT_GITHUB_REPO = 'sly_blog';
 const DEFAULT_GITHUB_IMAGE_REPO = 'sly_blog_images';
 const DEFAULT_GITHUB_BRANCH = 'main';
 const POSTS_DIR = 'source/_posts';
+const DIARY_DIR = 'source/_diary';
 const DEFAULT_IMAGE_PREFIX = 'blog';
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const MAX_IMAGE_BODY_BYTES = 14 * 1024 * 1024;
@@ -145,24 +145,23 @@ async function navSites(request, env) {
 }
 
 async function diaryEntries(request, env) {
-  if (!env.SKILL_TREE_KV) {
-    return json({ ok: false, error: 'KV_NOT_CONFIGURED' }, request, env, 500);
-  }
-
   const url = new URL(request.url);
 
   if (request.method === 'GET') {
-    const store = await readDiaryStore(env);
-    const date = sanitizeDiaryDate(url.searchParams.get('date'));
-    if (date) {
-      return json({ ok: true, entry: store.entries[date] || null }, request, env);
-    }
+    try {
+      const date = sanitizeDiaryDate(url.searchParams.get('date'));
+      if (date) {
+        const entry = await readDiaryEntryFromGithub(date, env);
+        return json({ ok: true, entry }, request, env);
+      }
 
-    const month = sanitizeDiaryMonth(url.searchParams.get('month')) || currentDiaryMonth();
-    const entries = Object.values(store.entries)
-      .filter((entry) => entry.date.startsWith(`${month}-`))
-      .sort((a, b) => a.date.localeCompare(b.date));
-    return json({ ok: true, month, entries }, request, env);
+      const month = sanitizeDiaryMonth(url.searchParams.get('month')) || currentDiaryMonth();
+      const entries = await listDiaryEntriesFromGithub(month, env);
+      return json({ ok: true, month, entries }, request, env);
+    } catch (error) {
+      const status = error.status || 500;
+      return json({ ok: false, error: error.message || 'GITHUB_READ_FAILED' }, request, env, status);
+    }
   }
 
   if (request.method === 'POST' || request.method === 'PUT' || request.method === 'PATCH') {
@@ -178,11 +177,17 @@ async function diaryEntries(request, env) {
       return json({ ok: false, error: error.message || 'INVALID_REQUEST' }, request, env, 400);
     }
 
-    const store = await readDiaryStore(env);
-    store.entries[entry.date] = entry;
-    store.updatedAt = entry.updatedAt;
-    await env.SKILL_TREE_KV.put(DIARY_KEY, JSON.stringify(store));
-    return json({ ok: true, entry }, request, env);
+    if (!String(env.GITHUB_TOKEN || '').trim()) {
+      return json({ ok: false, error: 'GITHUB_TOKEN_NOT_CONFIGURED' }, request, env, 500);
+    }
+
+    try {
+      const result = await saveDiaryEntryToGithub(entry, env);
+      return json({ ok: true, entry: result.entry, path: result.path, commitUrl: result.commitUrl }, request, env);
+    } catch (error) {
+      const status = error.status || 500;
+      return json({ ok: false, error: error.message || 'GITHUB_WRITE_FAILED' }, request, env, status);
+    }
   }
 
   if (request.method === 'DELETE') {
@@ -194,45 +199,20 @@ async function diaryEntries(request, env) {
     const date = sanitizeDiaryDate(url.searchParams.get('date'));
     if (!date) return json({ ok: false, error: 'INVALID_DATE' }, request, env, 400);
 
-    const store = await readDiaryStore(env);
-    delete store.entries[date];
-    store.updatedAt = new Date().toISOString();
-    await env.SKILL_TREE_KV.put(DIARY_KEY, JSON.stringify(store));
-    return json({ ok: true, date }, request, env);
+    if (!String(env.GITHUB_TOKEN || '').trim()) {
+      return json({ ok: false, error: 'GITHUB_TOKEN_NOT_CONFIGURED' }, request, env, 500);
+    }
+
+    try {
+      const result = await deleteDiaryEntryFromGithub(date, env);
+      return json({ ok: true, date, path: result.path, commitUrl: result.commitUrl }, request, env);
+    } catch (error) {
+      const status = error.status || 500;
+      return json({ ok: false, error: error.message || 'GITHUB_DELETE_FAILED' }, request, env, status);
+    }
   }
 
   return json({ ok: false, error: 'METHOD_NOT_ALLOWED' }, request, env, 405);
-}
-
-async function readDiaryStore(env) {
-  const raw = await env.SKILL_TREE_KV.get(DIARY_KEY);
-  if (!raw) return { version: 1, updatedAt: '', entries: {} };
-
-  try {
-    const parsed = JSON.parse(raw);
-    const entries = parsed && typeof parsed.entries === 'object' && parsed.entries ? parsed.entries : {};
-    return {
-      version: 1,
-      updatedAt: trimText(parsed && parsed.updatedAt, 40),
-      entries: normalizeDiaryEntries(entries)
-    };
-  } catch (error) {
-    return { version: 1, updatedAt: '', entries: {} };
-  }
-}
-
-function normalizeDiaryEntries(entries) {
-  return Object.values(entries || {}).reduce((result, item) => {
-    const date = sanitizeDiaryDate(item && item.date);
-    const content = trimText(item && item.content, MAX_DIARY_CONTENT_LENGTH);
-    if (!date || !content) return result;
-    result[date] = {
-      date,
-      content,
-      updatedAt: trimText(item && item.updatedAt, 40)
-    };
-    return result;
-  }, {});
 }
 
 function normalizeDiaryEntry(input) {
@@ -245,6 +225,148 @@ function normalizeDiaryEntry(input) {
     content,
     updatedAt: new Date().toISOString()
   };
+}
+
+async function listDiaryEntriesFromGithub(month, env) {
+  const { owner, repo, branch } = githubRepoConfig(env);
+  const endpoint = githubContentsEndpoint(owner, repo, DIARY_DIR);
+  const response = await fetch(`${endpoint}?ref=${encodeURIComponent(branch)}`, { headers: githubHeaders(env) });
+  const items = await response.json().catch(() => []);
+
+  if (!response.ok) {
+    if (response.status === 404) return [];
+    throw httpError((items && items.message) || 'GITHUB_READ_FAILED', response.status);
+  }
+
+  const files = Array.isArray(items)
+    ? items.filter((item) => item && item.type === 'file' && item.name.startsWith(`${month}-`) && /\.md$/i.test(item.name))
+    : [];
+
+  const entries = await Promise.all(files.map((item) => readDiaryEntryFromGithub(item.name.replace(/\.md$/i, ''), env)));
+  return entries.filter(Boolean).sort((a, b) => a.date.localeCompare(b.date));
+}
+
+async function readDiaryEntryFromGithub(date, env) {
+  const diaryPath = diaryEntryPath(date);
+  if (!diaryPath) throw httpError('INVALID_DATE', 400);
+
+  const { owner, repo, branch } = githubRepoConfig(env);
+  const endpoint = githubContentsEndpoint(owner, repo, diaryPath);
+  const response = await fetch(`${endpoint}?ref=${encodeURIComponent(branch)}`, { headers: githubHeaders(env) });
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    if (response.status === 404) return null;
+    throw httpError((data && data.message) || 'GITHUB_READ_FAILED', response.status);
+  }
+
+  const parsed = parsePostContent(utf8FromBase64(data.content || ''));
+  return {
+    date,
+    content: parsed.markdown.trim(),
+    updatedAt: String(parsed.meta.updated || parsed.meta.updatedAt || ''),
+    path: diaryPath,
+    htmlUrl: data.html_url || ''
+  };
+}
+
+async function saveDiaryEntryToGithub(entry, env) {
+  const diaryPath = diaryEntryPath(entry.date);
+  if (!diaryPath) throw httpError('INVALID_DATE', 400);
+
+  const { owner, repo, branch } = githubRepoConfig(env);
+  const endpoint = githubContentsEndpoint(owner, repo, diaryPath);
+  const headers = githubHeaders(env);
+
+  let sha = '';
+  const existing = await fetch(`${endpoint}?ref=${encodeURIComponent(branch)}`, { headers });
+  if (existing.ok) {
+    const data = await existing.json();
+    sha = data.sha || '';
+  } else if (existing.status !== 404) {
+    throw httpError('GITHUB_READ_FAILED', existing.status);
+  }
+
+  const body = {
+    message: `${sha ? 'Update' : 'Create'} diary: ${entry.date}`,
+    content: base64FromUtf8(buildDiaryMarkdown(entry)),
+    branch
+  };
+  if (sha) body.sha = sha;
+
+  const response = await fetch(endpoint, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify(body)
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw httpError(result.message || 'GITHUB_WRITE_FAILED', response.status);
+  }
+
+  return {
+    path: diaryPath,
+    entry: {
+      ...entry,
+      path: diaryPath,
+      htmlUrl: result.content && result.content.html_url
+    },
+    commitUrl: result.commit && result.commit.html_url
+  };
+}
+
+async function deleteDiaryEntryFromGithub(date, env) {
+  const diaryPath = diaryEntryPath(date);
+  if (!diaryPath) throw httpError('INVALID_DATE', 400);
+
+  const { owner, repo, branch } = githubRepoConfig(env);
+  const endpoint = githubContentsEndpoint(owner, repo, diaryPath);
+  const headers = githubHeaders(env);
+  const existing = await fetch(`${endpoint}?ref=${encodeURIComponent(branch)}`, { headers });
+  const data = await existing.json().catch(() => ({}));
+
+  if (!existing.ok) {
+    if (existing.status === 404) throw httpError('DIARY_NOT_FOUND', 404);
+    throw httpError((data && data.message) || 'GITHUB_READ_FAILED', existing.status);
+  }
+
+  const response = await fetch(endpoint, {
+    method: 'DELETE',
+    headers,
+    body: JSON.stringify({
+      message: `Delete diary: ${date}`,
+      sha: data.sha,
+      branch
+    })
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw httpError(result.message || 'GITHUB_DELETE_FAILED', response.status);
+  }
+
+  return {
+    path: diaryPath,
+    commitUrl: result.commit && result.commit.html_url
+  };
+}
+
+function buildDiaryMarkdown(entry) {
+  return [
+    '---',
+    `title: ${yamlString(`${entry.date} 日记`)}`,
+    `date: ${yamlString(entry.date)}`,
+    `updated: ${yamlString(entry.updatedAt)}`,
+    'type: diary',
+    '---',
+    '',
+    entry.content.trim(),
+    ''
+  ].join('\n');
+}
+
+function diaryEntryPath(date) {
+  const safeDate = sanitizeDiaryDate(date);
+  return safeDate ? `${DIARY_DIR}/${safeDate}.md` : '';
 }
 
 function sanitizeDiaryDate(value) {
@@ -1106,13 +1228,15 @@ function cosEncode(value) {
 }
 
 function githubHeaders(env) {
-  return {
+  const token = String(env.GITHUB_TOKEN || '').trim();
+  const headers = {
     accept: 'application/vnd.github+json',
-    authorization: `Bearer ${String(env.GITHUB_TOKEN || '').trim()}`,
     'content-type': 'application/json',
     'user-agent': 'sly-blog-writer',
     'x-github-api-version': '2022-11-28'
   };
+  if (token) headers.authorization = `Bearer ${token}`;
+  return headers;
 }
 
 function githubRepoConfig(env) {

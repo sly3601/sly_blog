@@ -99,7 +99,7 @@
             <input type="password" data-diary-token placeholder="管理员密钥" autocomplete="off">
           </label>
         </div>
-        <textarea data-diary-textarea maxlength="5000" rows="7" placeholder="今天发生了什么？"></textarea>
+        <textarea data-diary-textarea maxlength="5000" rows="7" placeholder="今天发生了什么？保存后会自动提交到 GitHub。"></textarea>
         <div class="diary-editor-actions">
           <button class="diary-soft-button diary-save-button" type="submit">
             <i class="fas fa-save"></i><span>保存</span>
@@ -224,7 +224,7 @@
       });
       entries.set(data.entry.date, data.entry);
       editorOpen = false;
-      setStatus('已保存');
+      setStatus('已保存到 GitHub');
       render();
     } catch (error) {
       setStatus(error.message || '保存失败');
@@ -254,7 +254,7 @@
       });
       entries.delete(selectedDate);
       editorOpen = false;
-      setStatus('已删除');
+      setStatus('已从 GitHub 删除');
       render();
     } catch (error) {
       setStatus(error.message || '删除失败');
@@ -410,7 +410,11 @@
     const map = {
       ADMIN_TOKEN_NOT_CONFIGURED: '密钥未配置',
       UNAUTHORIZED: '密钥不对',
-      KV_NOT_CONFIGURED: 'KV 未配置',
+      GITHUB_TOKEN_NOT_CONFIGURED: 'GitHub Token 未配置',
+      GITHUB_READ_FAILED: 'GitHub 读取失败',
+      GITHUB_WRITE_FAILED: 'GitHub 保存失败',
+      GITHUB_DELETE_FAILED: 'GitHub 删除失败',
+      DIARY_NOT_FOUND: '这天还没写',
       INVALID_DATE: '日期不对',
       BODY_REQUIRED: '内容为空',
       REQUEST_TOO_LARGE: '内容太长',

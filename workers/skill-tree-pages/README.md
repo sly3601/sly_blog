@@ -46,9 +46,9 @@ Authorization: Bearer <ADMIN_TOKEN>
 The homepage diary widget uses:
 
 ```text
-GET /diary?month=YYYY-MM
-POST /diary
-DELETE /diary?date=YYYY-MM-DD
+GET /diary?month=YYYY-MM                  # read source/_diary/*.md from GitHub
+POST /diary                               # write source/_diary/YYYY-MM-DD.md to GitHub
+DELETE /diary?date=YYYY-MM-DD             # delete one GitHub diary file
 Authorization: Bearer <ADMIN_TOKEN> for writes
 ```
 
