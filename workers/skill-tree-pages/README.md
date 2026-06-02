@@ -34,6 +34,16 @@ POST /blog-images
 Authorization: Bearer <ADMIN_TOKEN>
 ```
 
+The `/media/` bookshelf page and `/write/` media mode use:
+
+```text
+GET /media-items
+GET /media-items?action=read&path=source/media/items/slug/index.md
+POST /media-items
+DELETE /media-items?path=source/media/items/slug/index.md
+Authorization: Bearer <ADMIN_TOKEN> for writes
+```
+
 The private `/nav/` page uses the same admin token:
 
 ```text

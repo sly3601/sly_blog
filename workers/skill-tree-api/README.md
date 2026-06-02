@@ -10,6 +10,10 @@ Cloudflare Worker + KV API for the blog skill tree.
 - `GET /blog-posts?action=read&path=source/_posts/name.md`: read one post from GitHub.
 - `POST /blog-posts`: create or update one post in GitHub.
 - `DELETE /blog-posts?path=source/_posts/name.md`: delete one post from GitHub.
+- `GET /media-items`: list bookshelf media pages from GitHub under `source/media/items/`.
+- `GET /media-items?action=read&path=source/media/items/slug/index.md`: read one bookshelf item.
+- `POST /media-items`: create or update one bookshelf item. Requires `Authorization: Bearer <ADMIN_TOKEN>`.
+- `DELETE /media-items?path=source/media/items/slug/index.md`: delete one bookshelf item. Requires `Authorization: Bearer <ADMIN_TOKEN>`.
 - `POST /blog-images`: upload one image and return its public URL. Requires `Authorization: Bearer <ADMIN_TOKEN>`.
 - `GET /nav-sites`: read private navigation bookmarks. Requires `Authorization: Bearer <ADMIN_TOKEN>`.
 - `PUT /nav-sites`: replace private navigation bookmarks. Requires `Authorization: Bearer <ADMIN_TOKEN>`.

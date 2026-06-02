@@ -63,6 +63,29 @@ top_img: false
           <i class="fas fa-feather-alt"></i><span>文章信息</span>
         </div>
         <label class="write-field">
+          <span>内容类型</span>
+          <select id="writeContentType">
+            <option value="post">普通文章</option>
+            <option value="media">书影音</option>
+          </select>
+        </label>
+        <label class="write-field write-media-field">
+          <span>书影音类型</span>
+          <select id="writeMediaType">
+            <option value="book">书</option>
+            <option value="music">音乐</option>
+            <option value="movie">电影</option>
+          </select>
+        </label>
+        <label class="write-field write-media-field">
+          <span>作者 / 艺术家 / 导演</span>
+          <input id="writeCreator" type="text" maxlength="120" placeholder="比如：村上春树 / Radiohead / 王家卫">
+        </label>
+        <label class="write-field write-media-field">
+          <span>评分</span>
+          <input id="writeRating" type="number" min="0" max="10" step="0.1" placeholder="0-10，可选">
+        </label>
+        <label class="write-field">
           <span>标题</span>
           <input id="writeTitle" type="text" maxlength="80" placeholder="比如：机器人全栈学习路线">
         </label>

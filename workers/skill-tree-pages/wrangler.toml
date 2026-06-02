@@ -7,7 +7,7 @@ binding = "SKILL_TREE_KV"
 id = "05dd298085384c268dfb9407e7fce1e9"
 
 [vars]
-ALLOWED_ORIGINS = "https://sly3601.github.io,http://localhost:4002,http://localhost:4003"
+ALLOWED_ORIGINS = "https://sly3601.github.io,http://localhost:4002,http://localhost:4003,http://localhost:4012,http://127.0.0.1:4012"
 # /write image uploads use a separate GitHub repo by default.
 # Secret required: GITHUB_TOKEN
 # Optional vars:

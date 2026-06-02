@@ -11,6 +11,7 @@ nav:
 menu:
   Home: / || fas fa-home
   导航: /nav/ || fas fa-compass
+  书影音: /media/ || fas fa-book-open
   留言板: /comments/ || fas fa-envelope
   时间轴: /archives/ || fas fa-archive
   标签: /tags/ || fas fa-tags

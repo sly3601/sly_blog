@@ -26,6 +26,10 @@
   const els = {
     title: document.getElementById('writeTitle'),
     slug: document.getElementById('writeSlug'),
+    contentType: document.getElementById('writeContentType'),
+    mediaType: document.getElementById('writeMediaType'),
+    creator: document.getElementById('writeCreator'),
+    rating: document.getElementById('writeRating'),
     category: document.getElementById('writeCategory'),
     tags: document.getElementById('writeTags'),
     cover: document.getElementById('writeCover'),
@@ -69,6 +73,7 @@
     restoreDraft();
     createEditor();
     bindEvents();
+    syncContentTypeFields();
     updateCoverPreview();
     setStatus('草稿已就绪');
     if (getAdminToken()) loadPostList(false);
@@ -106,16 +111,21 @@
   }
 
   function bindEvents() {
-    [els.title, els.slug, els.category, els.tags, els.cover, els.description, els.endpoint, els.token, els.overwrite].forEach((input) => {
+    [els.title, els.slug, els.contentType, els.mediaType, els.creator, els.rating, els.category, els.tags, els.cover, els.description, els.endpoint, els.token, els.overwrite].forEach((input) => {
       input.addEventListener('input', () => {
         if (input === els.slug) slugTouched = true;
         if (input === els.title && !slugTouched) {
           els.slug.value = toFileSlug(els.title.value);
         }
         if (input === els.cover) updateCoverPreview();
+        if (input === els.contentType) syncContentTypeFields();
+        if (input === els.mediaType && els.contentType.value === 'media' && !els.tags.value.trim()) syncContentTypeFields();
         scheduleDraftSave();
       });
-      input.addEventListener('change', scheduleDraftSave);
+      input.addEventListener('change', () => {
+        if (input === els.contentType || input === els.mediaType) syncContentTypeFields();
+        scheduleDraftSave();
+      });
     });
 
     document.querySelectorAll('[data-insert]').forEach((button) => {
@@ -182,18 +192,23 @@
     }
 
     rememberConfig();
-    setStatus('正在读取 GitHub 文章列表...');
+    setStatus('正在读取 GitHub 内容列表...');
     setLoading([els.refreshPosts, els.loadPost, els.deletePost], true);
 
     try {
-      const data = await apiRequest('/blog-posts?action=list', { method: 'GET' });
-      postList = Array.isArray(data.posts) ? data.posts : [];
+      const [postData, mediaData] = await Promise.all([
+        apiRequest('/blog-posts?action=list', { method: 'GET' }),
+        apiRequest('/media-items', { method: 'GET' })
+      ]);
+      const posts = Array.isArray(postData.posts) ? postData.posts.map((post) => ({ ...post, contentType: 'post' })) : [];
+      const mediaItems = Array.isArray(mediaData.items) ? mediaData.items.map((item) => ({ ...item, contentType: 'media' })) : [];
+      postList = [...posts, ...mediaItems].sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
       renderPostOptions();
-      setStatus(`已读取 ${postList.length} 篇文章`);
-      if (showMessage) showToast(`已读取 ${postList.length} 篇文章`);
+      setStatus(`已读取 ${postList.length} 个内容`);
+      if (showMessage) showToast(`已读取 ${postList.length} 个内容`);
     } catch (error) {
-      setStatus('文章列表读取失败');
-      showToast(error.message || '文章列表读取失败');
+      setStatus('内容列表读取失败');
+      showToast(error.message || '内容列表读取失败');
     } finally {
       setLoading([els.refreshPosts, els.loadPost, els.deletePost], false);
       updateDeleteState();
@@ -206,19 +221,23 @@
       showToast('先选择一篇文章');
       return;
     }
+    const target = getSelectedPost();
+    const endpoint = target && target.contentType === 'media'
+      ? `/media-items?action=read&path=${encodeURIComponent(path)}`
+      : `/blog-posts?action=read&path=${encodeURIComponent(path)}`;
 
     rememberConfig();
-    setStatus('正在载入文章...');
+    setStatus('正在载入内容...');
     setLoading([els.loadPost, els.refreshPosts, els.deletePost], true);
 
     try {
-      const data = await apiRequest(`/blog-posts?action=read&path=${encodeURIComponent(path)}`, { method: 'GET' });
-      applyLoadedPost(data);
+      const data = await apiRequest(endpoint, { method: 'GET' });
+      applyLoadedPost({ ...data, contentType: target && target.contentType === 'media' ? 'media' : 'post' });
       saveDraft();
       showToast(`已载入：${data.filename || path}`);
     } catch (error) {
-      setStatus('文章载入失败');
-      showToast(error.message || '文章载入失败');
+      setStatus('内容载入失败');
+      showToast(error.message || '内容载入失败');
     } finally {
       setLoading([els.loadPost, els.refreshPosts, els.deletePost], false);
       updateDeleteState();
@@ -245,11 +264,14 @@
     if (!confirmed) return;
 
     rememberConfig();
-    setStatus('正在删除文章...');
+    setStatus('正在删除内容...');
     setLoading([els.deletePost, els.loadPost, els.refreshPosts, els.publish], true);
 
     try {
-      const data = await apiRequest(`/blog-posts?path=${encodeURIComponent(target.path)}`, { method: 'DELETE' });
+      const deletePath = target.contentType === 'media'
+        ? `/media-items?path=${encodeURIComponent(target.path)}`
+        : `/blog-posts?path=${encodeURIComponent(target.path)}`;
+      const data = await apiRequest(deletePath, { method: 'DELETE' });
       postList = postList.filter((post) => post.path !== target.path);
       if (currentPost && currentPost.path === target.path) {
         startNewPost();
@@ -268,9 +290,14 @@
 
   function applyLoadedPost(data) {
     const meta = data.meta || {};
+    const contentType = data.contentType || (meta.media ? 'media' : 'post');
     const filename = data.filename || (data.path || '').split('/').pop() || '';
+    els.contentType.value = contentType;
     els.title.value = meta.title || filename.replace(/\.md$/i, '');
-    els.slug.value = filename.replace(/\.md$/i, '');
+    els.slug.value = data.slug || filename.replace(/\.md$/i, '');
+    els.mediaType.value = meta.mediaType || 'book';
+    els.creator.value = meta.creator || '';
+    els.rating.value = meta.rating || '';
     els.category.value = meta.category || '日记';
     els.tags.value = Array.isArray(meta.tags) ? meta.tags.join(', ') : '';
     els.cover.value = meta.cover || '';
@@ -282,17 +309,25 @@
     setCurrentPost({
       path: data.path || '',
       filename,
+      contentType,
+      slug: data.slug || '',
       date: meta.date || '',
-      htmlUrl: data.htmlUrl || ''
+      htmlUrl: data.htmlUrl || '',
+      pageUrl: data.pageUrl || ''
     });
+    syncContentTypeFields();
     setStatus(`正在编辑：${filename}`);
   }
 
   function startNewPost() {
     setCurrentPost(null);
     slugTouched = false;
+    els.contentType.value = 'post';
     els.title.value = '';
     els.slug.value = '';
+    els.mediaType.value = 'book';
+    els.creator.value = '';
+    els.rating.value = '';
     els.category.value = '日记';
     els.tags.value = '';
     els.cover.value = '';
@@ -300,6 +335,7 @@
     els.description.value = '';
     els.overwrite.checked = false;
     setMarkdown(DEFAULT_MARKDOWN);
+    syncContentTypeFields();
     saveDraft('已切换到新文章模式');
   }
 
@@ -314,7 +350,8 @@
     postList.forEach((post) => {
       const option = document.createElement('option');
       option.value = post.path;
-      option.textContent = `${post.title || post.filename}${post.date ? ` · ${post.date.slice(0, 10)}` : ''}`;
+      const prefix = post.contentType === 'media' ? '书影音' : '文章';
+      option.textContent = `【${prefix}】${post.title || post.filename}${post.date ? ` · ${post.date.slice(0, 10)}` : ''}`;
       els.postSelect.appendChild(option);
     });
 
@@ -329,8 +366,9 @@
     const publishText = els.publish.querySelector('span');
     if (publishText) publishText.textContent = currentPost ? '保存修改到 GitHub' : '发布到 GitHub';
     if (els.postMeta) {
+      const typeName = currentPost && currentPost.contentType === 'media' ? '书影音' : '文章';
       els.postMeta.textContent = currentPost
-        ? `正在编辑：${currentPost.filename || currentPost.path}${currentPost.date ? ` · 原日期 ${currentPost.date}` : ''}`
+        ? `正在编辑${typeName}：${currentPost.filename || currentPost.path}${currentPost.date ? ` · 原日期 ${currentPost.date}` : ''}`
         : '未载入文章';
     }
     if (currentPost && currentPost.path) {
@@ -356,6 +394,29 @@
   function updateDeleteState() {
     if (!els.deletePost) return;
     els.deletePost.disabled = !getSelectedPost();
+  }
+
+  function syncContentTypeFields() {
+    const isMedia = els.contentType.value === 'media';
+    document.querySelectorAll('.write-media-field').forEach((field) => {
+      field.hidden = !isMedia;
+    });
+
+    if (isMedia) {
+      if (!els.category.value || els.category.value === '日记') els.category.value = '书影音';
+      if (!els.tags.value.trim()) els.tags.value = mediaTypeLabel(els.mediaType.value);
+    } else {
+      if (els.category.value === '书影音') els.category.value = '日记';
+    }
+  }
+
+  function mediaTypeLabel(type) {
+    const map = {
+      book: '书',
+      music: '音乐',
+      movie: '电影'
+    };
+    return map[type] || '书';
   }
 
   function insertSnippet(kind) {
@@ -659,6 +720,10 @@
     return {
       title: els.title.value.trim(),
       slug: els.slug.value.trim(),
+      contentType: els.contentType.value,
+      mediaType: els.mediaType.value,
+      creator: els.creator.value.trim(),
+      rating: els.rating.value.trim(),
       category: els.category.value.trim(),
       tags: splitTags(els.tags.value),
       cover: els.cover.value.trim(),
@@ -691,7 +756,8 @@
     els.publish.disabled = true;
 
     try {
-      const response = await fetch(`${getApiBase()}/blog-posts`, {
+      const apiPath = payload.contentType === 'media' ? '/media-items' : '/blog-posts';
+      const response = await fetch(`${getApiBase()}${apiPath}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -709,14 +775,20 @@
         setCurrentPost({
           path: data.path,
           filename: data.path.split('/').pop(),
+          contentType: payload.contentType,
           date: payload.date,
-          htmlUrl: data.htmlUrl || ''
+          htmlUrl: data.htmlUrl || '',
+          pageUrl: data.pageUrl || ''
         });
       }
       saveDraft();
       setStatus(`已发布：${data.path}`);
       showToast(`已保存到 GitHub：${data.path}`);
-      if (data.htmlUrl) window.open(data.htmlUrl, '_blank', 'noopener');
+      if (payload.contentType === 'media' && data.pageUrl) {
+        window.open(`/sly_blog${data.pageUrl}`, '_blank', 'noopener');
+      } else if (data.htmlUrl) {
+        window.open(data.htmlUrl, '_blank', 'noopener');
+      }
     } catch (publishError) {
       setStatus('发布失败');
       showToast(publishError.message || '发布失败，请稍后重试');
@@ -754,8 +826,12 @@
 
     try {
       const draft = JSON.parse(raw);
+      els.contentType.value = draft.contentType || 'post';
       els.title.value = draft.title || '';
       els.slug.value = draft.slug || '';
+      els.mediaType.value = draft.mediaType || 'book';
+      els.creator.value = draft.creator || '';
+      els.rating.value = draft.rating || '';
       els.category.value = draft.category || '日记';
       els.tags.value = Array.isArray(draft.tags) ? draft.tags.join(', ') : (draft.tags || '');
       els.cover.value = draft.cover || '';
@@ -764,6 +840,7 @@
       slugTouched = Boolean(draft.slugTouched || draft.slug);
       setCurrentPost(draft.currentPost || null);
       app.dataset.draftMarkdown = draft.markdown || '';
+      syncContentTypeFields();
     } catch (error) {
       localStorage.removeItem(DRAFT_KEY);
     }
@@ -868,7 +945,9 @@
       TITLE_REQUIRED: '文章标题不能为空',
       BODY_REQUIRED: '正文不能为空',
       POST_PATH_REQUIRED: '没有指定要读取的文章',
+      MEDIA_PATH_REQUIRED: '没有指定要读取的书影音',
       POST_NOT_FOUND: 'GitHub 里没有找到这篇文章',
+      MEDIA_NOT_FOUND: 'GitHub 里没有找到这个书影音条目',
       FILE_EXISTS: '同名文章已存在，勾选“允许覆盖同名文章”后再试',
       GITHUB_READ_FAILED: 'GitHub 读取失败',
       GITHUB_WRITE_FAILED: 'GitHub 写入失败',

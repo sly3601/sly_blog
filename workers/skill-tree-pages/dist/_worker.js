@@ -9,6 +9,7 @@ const DEFAULT_GITHUB_IMAGE_REPO = 'sly_blog_images';
 const DEFAULT_GITHUB_BRANCH = 'main';
 const POSTS_DIR = 'source/_posts';
 const DIARY_DIR = 'source/_diary';
+const MEDIA_DIR = 'source/media/items';
 const DEFAULT_IMAGE_PREFIX = 'blog';
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const MAX_IMAGE_BODY_BYTES = 14 * 1024 * 1024;
@@ -24,6 +25,7 @@ const DEFAULT_ALLOWED_ORIGINS = [
   'http://localhost:4000',
   'http://localhost:4002',
   'http://localhost:4003',
+  'http://localhost:4012',
   'http://127.0.0.1:4012'
 ];
 
@@ -45,6 +47,10 @@ export default {
 
     if (url.pathname === '/blog-posts') {
       return blogPosts(request, env);
+    }
+
+    if (url.pathname === '/media-items') {
+      return mediaItems(request, env);
     }
 
     if (url.pathname === '/blog-images' || url.pathname.startsWith('/blog-images/')) {
@@ -573,6 +579,76 @@ async function blogPosts(request, env) {
   }
 }
 
+async function mediaItems(request, env) {
+  const url = new URL(request.url);
+
+  if (request.method === 'GET') {
+    const action = url.searchParams.get('action') || 'list';
+    try {
+      if (action === 'read') {
+        const mediaPath = normalizeMediaPath(url.searchParams.get('path') || url.searchParams.get('slug'));
+        if (!mediaPath) return json({ ok: false, error: 'MEDIA_PATH_REQUIRED' }, request, env, 400);
+        const result = await readMediaItemFromGithub(mediaPath, env);
+        return json({ ok: true, ...result }, request, env);
+      }
+
+      const result = await listMediaItemsFromGithub(env);
+      return json({ ok: true, ...result }, request, env);
+    } catch (error) {
+      const status = error.status || 500;
+      return json({ ok: false, error: error.message || 'GITHUB_READ_FAILED' }, request, env, status);
+    }
+  }
+
+  if (request.method === 'POST' || request.method === 'PUT' || request.method === 'PATCH') {
+    const authResult = authorize(request, env);
+    if (!authResult.ok) {
+      return json({ ok: false, error: authResult.error }, request, env, authResult.status);
+    }
+    if (!String(env.GITHUB_TOKEN || '').trim()) {
+      return json({ ok: false, error: 'GITHUB_TOKEN_NOT_CONFIGURED' }, request, env, 500);
+    }
+
+    let item;
+    try {
+      item = normalizeMediaItem(await readJsonBody(request));
+    } catch (error) {
+      return json({ ok: false, error: error.message || 'INVALID_REQUEST' }, request, env, 400);
+    }
+
+    try {
+      const result = await saveMediaItemToGithub(item, env);
+      return json({ ok: true, ...result }, request, env);
+    } catch (error) {
+      const status = error.status || 500;
+      return json({ ok: false, error: error.message || 'GITHUB_WRITE_FAILED' }, request, env, status);
+    }
+  }
+
+  if (request.method === 'DELETE') {
+    const authResult = authorize(request, env);
+    if (!authResult.ok) {
+      return json({ ok: false, error: authResult.error }, request, env, authResult.status);
+    }
+    if (!String(env.GITHUB_TOKEN || '').trim()) {
+      return json({ ok: false, error: 'GITHUB_TOKEN_NOT_CONFIGURED' }, request, env, 500);
+    }
+
+    const mediaPath = normalizeMediaPath(url.searchParams.get('path') || url.searchParams.get('slug'));
+    if (!mediaPath) return json({ ok: false, error: 'MEDIA_PATH_REQUIRED' }, request, env, 400);
+
+    try {
+      const result = await deleteMediaItemFromGithub(mediaPath, env);
+      return json({ ok: true, ...result }, request, env);
+    } catch (error) {
+      const status = error.status || 500;
+      return json({ ok: false, error: error.message || 'GITHUB_DELETE_FAILED' }, request, env, status);
+    }
+  }
+
+  return json({ ok: false, error: 'METHOD_NOT_ALLOWED' }, request, env, 405);
+}
+
 function normalizePost(input) {
   const title = trimText(input && input.title, 120);
   if (!title) throw new Error('TITLE_REQUIRED');
@@ -630,6 +706,218 @@ function buildPostMarkdown(post, existingMeta = {}) {
 
   lines.push('---', '', post.markdown.trim(), '');
   return lines.join('\n');
+}
+
+function normalizeMediaItem(input) {
+  const title = trimText(input && input.title, 120);
+  if (!title) throw new Error('TITLE_REQUIRED');
+
+  const markdown = String((input && input.markdown) || '').trim();
+  if (!markdown) throw new Error('BODY_REQUIRED');
+
+  const sourcePath = normalizeMediaPath(input && input.sourcePath);
+  const slug = sourcePath ? sourcePath.split('/').slice(-2, -1)[0] : sanitizeFilename(input && (input.slug || input.title)).toLowerCase();
+  const date = sanitizeDate(input && input.date) || formatDate(new Date());
+  const mediaType = normalizeMediaType(input && (input.mediaType || input.type));
+  const creator = trimText(input && input.creator, 120);
+  const rating = normalizeRating(input && input.rating);
+  const cover = trimText(input && input.cover, 500);
+  const description = trimText(input && input.description, 220);
+  const tags = Array.isArray(input && input.tags)
+    ? input.tags.map((tag) => trimText(tag, 50)).filter(Boolean).slice(0, 20)
+    : [];
+
+  return {
+    title,
+    slug,
+    filename: 'index.md',
+    path: sourcePath || `${MEDIA_DIR}/${slug}/index.md`,
+    sourcePath,
+    date,
+    updated: formatDate(new Date()),
+    mediaType,
+    creator,
+    rating,
+    cover,
+    description,
+    tags,
+    markdown,
+    overwrite: Boolean((input && input.overwrite) || sourcePath)
+  };
+}
+
+function buildMediaMarkdown(item, existingMeta = {}) {
+  const lines = [
+    '---',
+    `title: ${yamlString(item.title)}`,
+    `date: ${yamlString(item.date)}`,
+    `updated: ${yamlString(item.updated)}`,
+    'layout: post',
+    'media: true',
+    `media_type: ${yamlString(item.mediaType)}`,
+    'categories:',
+    '  - "书影音"'
+  ];
+
+  if (item.creator) lines.push(`creator: ${yamlString(item.creator)}`);
+  if (item.rating) lines.push(`rating: ${yamlString(item.rating)}`);
+  if (item.cover) lines.push(`cover: ${yamlString(item.cover)}`);
+  if (item.description) lines.push(`description: ${yamlString(item.description)}`);
+  if (item.tags.length) {
+    lines.push('tags:', ...item.tags.map((tag) => `  - ${yamlString(tag)}`));
+  }
+
+  const managedKeys = new Set([
+    'title', 'date', 'updated', 'layout', 'media', 'media_type', 'categories', 'category',
+    'creator', 'rating', 'cover', 'description', 'tags'
+  ]);
+  Object.entries(existingMeta || {}).forEach(([key, value]) => {
+    if (!key || managedKeys.has(key)) return;
+    lines.push(...formatYamlEntry(key, value));
+  });
+
+  lines.push('---', '', item.markdown.trim(), '');
+  return lines.join('\n');
+}
+
+async function listMediaItemsFromGithub(env) {
+  const { owner, repo, branch } = githubRepoConfig(env);
+  const endpoint = githubContentsEndpoint(owner, repo, MEDIA_DIR);
+  const headers = githubHeaders(env);
+  const response = await fetch(`${endpoint}?ref=${encodeURIComponent(branch)}`, { headers });
+  const items = await response.json().catch(() => []);
+
+  if (!response.ok) {
+    if (response.status === 404) return { items: [], branch, path: MEDIA_DIR };
+    throw httpError((items && items.message) || 'GITHUB_READ_FAILED', response.status);
+  }
+
+  const directories = Array.isArray(items)
+    ? items.filter((item) => item && item.type === 'dir').slice(0, 160)
+    : [];
+
+  const mediaItems = await Promise.all(directories.map(async (item) => {
+    try {
+      const result = await readMediaItemFromGithub(`${item.path}/index.md`, env);
+      return mediaMetaForList(result);
+    } catch (error) {
+      return null;
+    }
+  }));
+
+  const filtered = mediaItems.filter(Boolean);
+  filtered.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')) || a.title.localeCompare(b.title, 'zh-Hans-CN'));
+  return { items: filtered, branch, path: MEDIA_DIR };
+}
+
+async function readMediaItemFromGithub(mediaPath, env) {
+  const normalizedPath = normalizeMediaPath(mediaPath);
+  if (!normalizedPath) throw httpError('MEDIA_PATH_REQUIRED', 400);
+
+  const { owner, repo, branch } = githubRepoConfig(env);
+  const endpoint = githubContentsEndpoint(owner, repo, normalizedPath);
+  const response = await fetch(`${endpoint}?ref=${encodeURIComponent(branch)}`, { headers: githubHeaders(env) });
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw httpError((data && data.message) || 'GITHUB_READ_FAILED', response.status);
+  }
+
+  const raw = utf8FromBase64(data.content || '');
+  const parsed = parsePostContent(raw);
+  return {
+    path: normalizedPath,
+    filename: 'index.md',
+    slug: mediaSlugFromPath(normalizedPath),
+    pageUrl: mediaPageUrl(normalizedPath),
+    sha: data.sha || '',
+    htmlUrl: data.html_url || '',
+    meta: mediaMetaForClient(parsed.meta),
+    markdown: parsed.markdown,
+    raw
+  };
+}
+
+async function saveMediaItemToGithub(item, env) {
+  const { owner, repo, branch } = githubRepoConfig(env);
+  const endpoint = githubContentsEndpoint(owner, repo, item.path);
+  const headers = githubHeaders(env);
+
+  let sha = '';
+  let existingMeta = {};
+  const existing = await fetch(`${endpoint}?ref=${encodeURIComponent(branch)}`, { headers });
+  if (existing.ok) {
+    const data = await existing.json();
+    sha = data.sha || '';
+    if (!item.overwrite) throw httpError('FILE_EXISTS', 409);
+    existingMeta = parsePostContent(utf8FromBase64(data.content || '')).meta;
+  } else if (existing.status !== 404) {
+    throw httpError('GITHUB_READ_FAILED', existing.status);
+  }
+
+  const content = buildMediaMarkdown(item, existingMeta);
+  const body = {
+    message: `${sha ? 'Update' : 'Publish'} media item: ${item.title}`,
+    content: base64FromUtf8(content),
+    branch
+  };
+  if (sha) body.sha = sha;
+
+  const response = await fetch(endpoint, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify(body)
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw httpError(result.message || 'GITHUB_WRITE_FAILED', response.status);
+  }
+
+  return {
+    path: item.path,
+    branch,
+    pageUrl: mediaPageUrl(item.path),
+    htmlUrl: result.content && result.content.html_url,
+    commitUrl: result.commit && result.commit.html_url
+  };
+}
+
+async function deleteMediaItemFromGithub(mediaPath, env) {
+  const normalizedPath = normalizeMediaPath(mediaPath);
+  if (!normalizedPath) throw httpError('MEDIA_PATH_REQUIRED', 400);
+
+  const { owner, repo, branch } = githubRepoConfig(env);
+  const endpoint = githubContentsEndpoint(owner, repo, normalizedPath);
+  const headers = githubHeaders(env);
+  const existing = await fetch(`${endpoint}?ref=${encodeURIComponent(branch)}`, { headers });
+  const data = await existing.json().catch(() => ({}));
+
+  if (!existing.ok) {
+    if (existing.status === 404) throw httpError('MEDIA_NOT_FOUND', 404);
+    throw httpError((data && data.message) || 'GITHUB_READ_FAILED', existing.status);
+  }
+  if (!data.sha) throw httpError('GITHUB_READ_FAILED', 500);
+
+  const response = await fetch(endpoint, {
+    method: 'DELETE',
+    headers,
+    body: JSON.stringify({
+      message: `Delete media item: ${mediaSlugFromPath(normalizedPath)}`,
+      sha: data.sha,
+      branch
+    })
+  });
+
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw httpError(result.message || 'GITHUB_DELETE_FAILED', response.status);
+  }
+
+  return {
+    path: normalizedPath,
+    branch,
+    commitUrl: result.commit && result.commit.html_url
+  };
 }
 
 async function listPostsFromGithub(env) {
@@ -1291,6 +1579,35 @@ function normalizePostPath(value) {
   return parts.join('/');
 }
 
+function normalizeMediaPath(value) {
+  const text = String(value || '').trim().replace(/\\/g, '/').replace(/^\/+/, '');
+  if (!text) return '';
+
+  let path = text;
+  if (!path.startsWith(`${MEDIA_DIR}/`)) {
+    const slug = sanitizeFilename(path.replace(/\/index\.md$/i, '').replace(/\.md$/i, '')).toLowerCase();
+    path = `${MEDIA_DIR}/${slug}/index.md`;
+  }
+  if (!/\/index\.md$/i.test(path)) path = `${path.replace(/\/+$/, '')}/index.md`;
+
+  const parts = path.split('/').map((part) => part.trim()).filter(Boolean);
+  if (parts.length !== 5 || parts[0] !== 'source' || parts[1] !== 'media' || parts[2] !== 'items') return '';
+  if (parts.some((part) => part === '.' || part === '..' || part.startsWith('..'))) return '';
+  if (parts[4] !== 'index.md') return '';
+  if (!/^[a-z0-9\u4e00-\u9fa5][a-z0-9\u4e00-\u9fa5._-]{0,90}$/i.test(parts[3])) return '';
+  return parts.join('/');
+}
+
+function mediaSlugFromPath(path) {
+  const parts = String(path || '').split('/');
+  return parts.length >= 5 ? parts[3] : '';
+}
+
+function mediaPageUrl(path) {
+  const slug = mediaSlugFromPath(path);
+  return slug ? `/media/items/${slug}/` : '';
+}
+
 function parsePostContent(content) {
   const text = String(content || '');
   const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(text);
@@ -1375,6 +1692,65 @@ function postMetaForClient(meta) {
     cover: String(meta.cover || ''),
     description: String(meta.description || '')
   };
+}
+
+function mediaMetaForClient(meta) {
+  const base = postMetaForClient(meta);
+  return {
+    ...base,
+    mediaType: normalizeMediaType(meta.media_type || meta.mediaType || meta.type),
+    creator: String(meta.creator || ''),
+    rating: normalizeRating(meta.rating),
+    media: true
+  };
+}
+
+function mediaMetaForList(item) {
+  const meta = mediaMetaForClient(item.meta || {});
+  return {
+    path: item.path,
+    filename: item.filename,
+    slug: item.slug,
+    pageUrl: item.pageUrl,
+    htmlUrl: item.htmlUrl,
+    title: meta.title || item.slug,
+    date: meta.date || '',
+    updated: meta.updated || '',
+    mediaType: meta.mediaType,
+    creator: meta.creator,
+    rating: meta.rating,
+    cover: meta.cover,
+    description: meta.description,
+    tags: meta.tags || []
+  };
+}
+
+function normalizeMediaType(value) {
+  const text = trimText(value, 20).toLowerCase();
+  const map = {
+    book: 'book',
+    books: 'book',
+    '书': 'book',
+    '书籍': 'book',
+    music: 'music',
+    album: 'music',
+    song: 'music',
+    '音乐': 'music',
+    '单曲': 'music',
+    '专辑': 'music',
+    movie: 'movie',
+    film: 'movie',
+    '电影': 'movie'
+  };
+  return map[text] || 'book';
+}
+
+function normalizeRating(value) {
+  const text = trimText(value, 20);
+  if (!text) return '';
+  const number = Number(text);
+  if (!Number.isFinite(number)) return text;
+  return String(Math.min(Math.max(number, 0), 10));
 }
 
 function formatYamlEntry(key, value) {
