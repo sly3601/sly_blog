@@ -45,7 +45,7 @@
   async function loadItems() {
     setStatus('正在整理书柜...');
     try {
-      const response = await fetch(`${apiBase()}/media-items`);
+      const response = await fetch(`${apiBase()}/media-items`, { cache: 'no-store' });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.ok) throw new Error(data.error || `HTTP ${response.status}`);
       items = Array.isArray(data.items) ? data.items : [];

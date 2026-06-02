@@ -752,7 +752,7 @@ function buildMediaMarkdown(item, existingMeta = {}) {
     `title: ${yamlString(item.title)}`,
     `date: ${yamlString(item.date)}`,
     `updated: ${yamlString(item.updated)}`,
-    'layout: post',
+    'layout: page',
     'media: true',
     `media_type: ${yamlString(item.mediaType)}`,
     'categories:',
@@ -1594,8 +1594,14 @@ function normalizeMediaPath(value) {
   if (parts.length !== 5 || parts[0] !== 'source' || parts[1] !== 'media' || parts[2] !== 'items') return '';
   if (parts.some((part) => part === '.' || part === '..' || part.startsWith('..'))) return '';
   if (parts[4] !== 'index.md') return '';
-  if (!/^[a-z0-9\u4e00-\u9fa5][a-z0-9\u4e00-\u9fa5._-]{0,90}$/i.test(parts[3])) return '';
+  if (!isSafeMediaSlug(parts[3])) return '';
   return parts.join('/');
+}
+
+function isSafeMediaSlug(value) {
+  const slug = trimText(value, 120);
+  if (!slug || slug === '.' || slug === '..' || slug.startsWith('..')) return false;
+  return !/[\\/:*?"<>|#%{}\^~[\]`\x00-\x1F]/.test(slug);
 }
 
 function mediaSlugFromPath(path) {

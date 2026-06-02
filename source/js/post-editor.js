@@ -861,8 +861,10 @@
   }
 
   async function apiRequest(path, options = {}) {
+    const method = String(options.method || 'GET').toUpperCase();
     const response = await fetch(`${getApiBase()}${path}`, {
       ...options,
+      cache: method === 'GET' ? 'no-store' : options.cache,
       headers: {
         Authorization: `Bearer ${getAdminToken()}`,
         ...(options.headers || {})

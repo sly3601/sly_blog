@@ -2,7 +2,7 @@
 title: "君の名は。"
 date: "2026-06-02 20:15:22"
 updated: "2026-06-02 12:15:23"
-layout: post
+layout: page
 media: true
 media_type: "movie"
 categories:

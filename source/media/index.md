@@ -30,5 +30,5 @@ top_img: false
   <p id="mediaShelfStatus" class="media-shelf-status">正在整理书柜...</p>
 </main>
 
-<script defer src="/sly_blog/js/media-shelf.js"></script>
+<script defer src="/sly_blog/js/media-shelf.js?v=20260602-media-list-fix"></script>
 {% endraw %}
