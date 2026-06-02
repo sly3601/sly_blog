@@ -399,7 +399,11 @@
   function syncContentTypeFields() {
     const isMedia = els.contentType.value === 'media';
     document.querySelectorAll('.write-media-field').forEach((field) => {
-      field.hidden = !isMedia;
+      field.classList.toggle('is-disabled', !isMedia);
+      field.setAttribute('aria-disabled', String(!isMedia));
+      field.querySelectorAll('input, select, textarea, button').forEach((control) => {
+        control.disabled = !isMedia;
+      });
     });
 
     if (isMedia) {

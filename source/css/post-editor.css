@@ -263,6 +263,28 @@
   box-shadow: 0 0 0 3px rgba(51, 112, 255, 0.12);
 }
 
+.write-field.is-disabled {
+  color: #9aa5b5;
+}
+
+.write-field.is-disabled input,
+.write-field.is-disabled select,
+.write-field.is-disabled textarea,
+.write-field input:disabled,
+.write-field select:disabled,
+.write-field textarea:disabled {
+  border-color: #e2e7ef;
+  background: #eef2f7;
+  color: #9aa5b5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.write-field.is-disabled input::placeholder,
+.write-field.is-disabled textarea::placeholder {
+  color: #b2bdcb;
+}
+
 .write-check {
   display: flex;
   align-items: center;
