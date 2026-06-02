@@ -721,13 +721,14 @@
   }
 
   function collectPayload() {
+    const isMedia = els.contentType.value === 'media';
     return {
       title: els.title.value.trim(),
       slug: els.slug.value.trim(),
       contentType: els.contentType.value,
-      mediaType: els.mediaType.value,
-      creator: els.creator.value.trim(),
-      rating: els.rating.value.trim(),
+      mediaType: isMedia ? els.mediaType.value : '',
+      creator: isMedia ? els.creator.value.trim() : '',
+      rating: isMedia ? els.rating.value.trim() : '',
       category: els.category.value.trim(),
       tags: splitTags(els.tags.value),
       cover: els.cover.value.trim(),

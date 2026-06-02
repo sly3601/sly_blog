@@ -223,6 +223,7 @@
 }
 
 .write-field {
+  position: relative;
   display: grid;
   gap: 7px;
   margin-bottom: 12px;
@@ -265,6 +266,7 @@
 
 .write-field.is-disabled {
   color: #9aa5b5;
+  opacity: 0.68;
 }
 
 .write-field.is-disabled input,
@@ -277,7 +279,27 @@
   background: #eef2f7;
   color: #9aa5b5;
   cursor: not-allowed;
+  pointer-events: none;
   box-shadow: none;
+}
+
+.write-media-field.is-disabled::after {
+  position: absolute;
+  top: 29px;
+  right: 10px;
+  z-index: 1;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: #c5cfdd;
+  color: #fff;
+  font-family: "Font Awesome 5 Free";
+  font-size: 0.75rem;
+  font-weight: 900;
+  line-height: 22px;
+  text-align: center;
+  content: "\f023";
+  pointer-events: none;
 }
 
 .write-field.is-disabled input::placeholder,

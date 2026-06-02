@@ -8,7 +8,7 @@ top_img: false
 
 {% raw %}
 <link rel="stylesheet" href="https://uicdn.toast.com/editor/latest/toastui-editor.min.css">
-<link rel="stylesheet" href="/sly_blog/css/post-editor.css">
+<link rel="stylesheet" href="/sly_blog/css/post-editor.css?v=20260602-media-lock-2">
 
 <div id="post-editor-app" class="post-editor-app" data-api-endpoint="https://sly-skill-tree-api-pages.pages.dev">
   <header class="write-topbar">
@@ -69,21 +69,21 @@ top_img: false
             <option value="media">书影音</option>
           </select>
         </label>
-        <label class="write-field write-media-field">
+        <label class="write-field write-media-field is-disabled" aria-disabled="true">
           <span>书影音类型</span>
-          <select id="writeMediaType">
+          <select id="writeMediaType" disabled>
             <option value="book">书</option>
             <option value="music">音乐</option>
             <option value="movie">电影</option>
           </select>
         </label>
-        <label class="write-field write-media-field">
+        <label class="write-field write-media-field is-disabled" aria-disabled="true">
           <span>作者 / 艺术家 / 导演</span>
-          <input id="writeCreator" type="text" maxlength="120" placeholder="比如：村上春树 / Radiohead / 王家卫">
+          <input id="writeCreator" type="text" maxlength="120" placeholder="比如：村上春树 / Radiohead / 王家卫" disabled>
         </label>
-        <label class="write-field write-media-field">
+        <label class="write-field write-media-field is-disabled" aria-disabled="true">
           <span>评分</span>
-          <input id="writeRating" type="number" min="0" max="10" step="0.1" placeholder="0-10，可选">
+          <input id="writeRating" type="number" min="0" max="10" step="0.1" placeholder="0-10，可选" disabled>
         </label>
         <label class="write-field">
           <span>标题</span>
@@ -173,5 +173,5 @@ top_img: false
 </div>
 
 <script defer src="https://uicdn.toast.com/editor/latest/toastui-editor-all.min.js"></script>
-<script defer src="/sly_blog/js/post-editor.js"></script>
+<script defer src="/sly_blog/js/post-editor.js?v=20260602-media-lock-2"></script>
 {% endraw %}
