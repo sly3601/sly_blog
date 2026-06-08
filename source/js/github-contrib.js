@@ -65,6 +65,8 @@
     }
 
     function useFallback() {
+      if (card.classList.contains('is-enhanced')) return;
+
       card.classList.add('is-fallback');
       if (stage === 0) {
         stage = 1;
