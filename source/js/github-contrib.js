@@ -21,7 +21,7 @@
   function localFallbackUrl() {
     const svg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="700" height="124" viewBox="0 0 700 124" role="img" aria-label="GitHub contribution calendar unavailable">
-  <rect width="100%" height="100%" rx="10" fill="rgba(255,255,255,0.18)"/>
+  <rect width="100%" height="100%" rx="10" fill="#ffffff" fill-opacity="0.18"/>
   <text x="24" y="56" fill="#8f5570" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="14" font-weight="700">暂时没有读到 @${USERNAME} 的 GitHub 贡献图</text>
   <text x="24" y="80" fill="#9b7284" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="12">刷新后会自动重试。</text>
 </svg>`;
@@ -30,7 +30,7 @@
 
   function enhanceSvg(svg) {
     return String(svg || '')
-      .replace(/fill="#fffafb"/gi, 'fill="rgba(255,255,255,0.12)"')
+      .replace(/fill="#fffafb"/gi, 'fill="#ffffff" fill-opacity="0.12"')
       .replace(/#f4e7ee/gi, '#f3e5ec')
       .replace(/#ffd2e4/gi, '#ee9bbb')
       .replace(new RegExp(`#${PINK}`, 'gi'), '#d83f84')
