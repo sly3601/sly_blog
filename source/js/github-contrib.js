@@ -29,7 +29,7 @@
   }
 
   function enhanceSvg(svg) {
-    return String(svg || '')
+    const polished = String(svg || '')
       .replace(/fill="#fffafb"/gi, 'fill="#ffffff" fill-opacity="0.12"')
       .replace(/#f4e7ee/gi, '#f3e5ec')
       .replace(/#ffd2e4/gi, '#ee9bbb')
@@ -38,6 +38,76 @@
       .replace(/#c93f80/gi, '#7f1f4e')
       .replace(/#9b7284/gi, '#8d6c7a')
       .replace(/#8f5570/gi, '#7e3154');
+
+    return glassContributionCells(polished);
+  }
+
+  function glassContributionCells(svg) {
+    const defs = `
+  <defs>
+    <linearGradient id="dropLevel0" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.72"/>
+      <stop offset="42%" stop-color="#ffffff" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#d83f84" stop-opacity="0.08"/>
+    </linearGradient>
+    <linearGradient id="dropLevel1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.78"/>
+      <stop offset="44%" stop-color="#f6b6cf" stop-opacity="0.36"/>
+      <stop offset="100%" stop-color="#d83f84" stop-opacity="0.22"/>
+    </linearGradient>
+    <linearGradient id="dropLevel2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.78"/>
+      <stop offset="42%" stop-color="#e8649b" stop-opacity="0.48"/>
+      <stop offset="100%" stop-color="#b92869" stop-opacity="0.36"/>
+    </linearGradient>
+    <linearGradient id="dropLevel3" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fff2f8" stop-opacity="0.82"/>
+      <stop offset="44%" stop-color="#c83375" stop-opacity="0.62"/>
+      <stop offset="100%" stop-color="#8e2458" stop-opacity="0.52"/>
+    </linearGradient>
+    <linearGradient id="dropLevel4" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fff7fb" stop-opacity="0.86"/>
+      <stop offset="42%" stop-color="#9e245f" stop-opacity="0.72"/>
+      <stop offset="100%" stop-color="#5f163b" stop-opacity="0.64"/>
+    </linearGradient>
+    <filter id="dropSoftShadow" x="-60%" y="-60%" width="220%" height="220%">
+      <feDropShadow dx="0" dy="1" stdDeviation="0.75" flood-color="#6b2348" flood-opacity="0.2"/>
+    </filter>
+  </defs>`;
+
+    return svg
+      .replace(/(<svg\b[^>]*>)/i, `$1${defs}`)
+      .replace(/<rect([^>]*\bx="[^"]+"[^>]*\by="[^"]+"[^>]*\bwidth="10"[^>]*\bheight="10"[^>]*)>(<title>[\s\S]*?<\/title>)<\/rect>/g, (match, attrs, title) => {
+        const fillMatch = attrs.match(/\bfill="([^"]+)"/i);
+        const level = contributionLevelFromFill(fillMatch && fillMatch[1]);
+        const cleanedAttrs = attrs
+          .replace(/\sfill="[^"]*"/i, '')
+          .replace(/\srx="[^"]*"/i, '');
+
+        return `<g class="drop-cell drop-cell-${level}" filter="url(#dropSoftShadow)">
+  <rect${cleanedAttrs} rx="4" fill="url(#dropLevel${level})" stroke="#ffffff" stroke-opacity="0.58" stroke-width="0.7">${title}</rect>
+  <circle cx="${cellHighlightX(attrs)}" cy="${cellHighlightY(attrs)}" r="1.35" fill="#ffffff" fill-opacity="0.62"/>
+</g>`;
+      });
+  }
+
+  function contributionLevelFromFill(fill) {
+    const color = String(fill || '').toLowerCase();
+    if (color.includes('7f1f4e')) return 4;
+    if (color.includes('b92869')) return 3;
+    if (color.includes('d83f84')) return 2;
+    if (color.includes('ee9bbb')) return 1;
+    return 0;
+  }
+
+  function cellHighlightX(attrs) {
+    const x = Number((String(attrs).match(/\bx="([^"]+)"/i) || [])[1]);
+    return Number.isFinite(x) ? (x + 3.1).toFixed(1) : 0;
+  }
+
+  function cellHighlightY(attrs) {
+    const y = Number((String(attrs).match(/\by="([^"]+)"/i) || [])[1]);
+    return Number.isFinite(y) ? (y + 2.8).toFixed(1) : 0;
   }
 
   async function enhanceChartImage(image, card, url) {
