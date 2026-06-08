@@ -1080,7 +1080,7 @@ footer_beautify:
 # 插入代码到头部 </head> 之前 和 底部 </body> 之前
 inject:
   head:
-    - <link rel="stylesheet" href="/sly_blog/css/custom.css?v=20260608-contrib-library3" media="defer" onload="this.media='all'">
+    - <link rel="stylesheet" href="/sly_blog/css/custom.css?v=20260608-wood-glow" media="defer" onload="this.media='all'">
   bottom:
     # - <script src="xxxx"></script>
     - <div class="aplayer no-destroy" data-id="9338978599" data-server="tencent" data-type="playlist" data-order="list" data-fixed="true" data-preload="auto" data-autoplay="false" data-mutex="true" ></div>
