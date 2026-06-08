@@ -48,7 +48,12 @@
       const svg = await response.text();
       if (!/<svg[\s>]/i.test(svg)) return;
 
-      image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(enhanceSvg(svg))}`;
+      const chart = image.closest('.github-contrib-chart');
+      if (chart) {
+        chart.innerHTML = enhanceSvg(svg);
+      } else {
+        image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(enhanceSvg(svg))}`;
+      }
       card.classList.add('is-enhanced');
     } catch (error) {
       // The original image URL remains usable when SVG enhancement is blocked.

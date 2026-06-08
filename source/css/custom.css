@@ -208,6 +208,13 @@
     height: auto;
   }
 
+  .github-contrib-chart svg {
+    display: block;
+    width: 100%;
+    min-width: 680px;
+    height: auto;
+  }
+
   #recent-posts > .daily-diary-card {
     display: block;
     flex: 0 0 100%;
