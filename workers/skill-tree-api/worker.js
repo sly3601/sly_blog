@@ -1802,7 +1802,7 @@ function httpError(message, status) {
 
 async function githubContributionsSvg(request, env, url) {
   const username = sanitizeGithubUser(url.searchParams.get('user') || 'sly3601');
-  const color = sanitizeHexColor(url.searchParams.get('color') || 'ffc1da');
+  const color = sanitizeHexColor(url.searchParams.get('color') || 'd83f84');
 
   try {
     const result = await readContributionCalendarFromGithubApi(username, env);
@@ -1953,10 +1953,10 @@ function renderContributionSvg({ username, color, days, total }) {
 <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeXml(username)} GitHub contribution calendar">
   <style>
     text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
-    .month, .label { fill: #9b7284; font-size: 10px; }
-    .summary { fill: #8f5570; font-size: 11px; font-weight: 700; }
+    .month, .label { fill: #8d6c7a; font-size: 10px; }
+    .summary { fill: #7e3154; font-size: 11px; font-weight: 700; }
   </style>
-  <rect width="100%" height="100%" rx="10" fill="#fffafb"/>
+  <rect width="100%" height="100%" rx="10" fill="rgba(255,255,255,0.12)"/>
   ${months}
   ${rows}
   ${rects}
@@ -1981,7 +1981,7 @@ function buildMonthLabels(days) {
 
 function buildPinkPalette(hex) {
   const base = `#${hex}`;
-  return ['#f4e7ee', '#ffd2e4', base, '#f574ad', '#c93f80'];
+  return ['rgba(158,118,136,0.18)', '#f29aba', base, '#b92869', '#7f1f4e'];
 }
 
 function contributionLevelNumber(level) {
@@ -1998,7 +1998,7 @@ function contributionLevelNumber(level) {
 function renderContributionFallback(username) {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="700" height="124" viewBox="0 0 700 124" role="img" aria-label="GitHub contribution calendar unavailable">
-  <rect width="100%" height="100%" rx="10" fill="#fffafb"/>
+  <rect width="100%" height="100%" rx="10" fill="rgba(255,255,255,0.12)"/>
   <text x="24" y="56" fill="#8f5570" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="14" font-weight="700">暂时没有读到 @${escapeXml(username)} 的 GitHub 贡献图</text>
   <text x="24" y="80" fill="#9b7284" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="12">刷新后会自动重试。</text>
 </svg>`;
@@ -2034,7 +2034,7 @@ function sanitizeGithubUser(value) {
 
 function sanitizeHexColor(value) {
   const color = String(value || '').trim().replace(/^#/, '');
-  return /^[0-9a-f]{6}$/i.test(color) ? color.toLowerCase() : 'ffc1da';
+  return /^[0-9a-f]{6}$/i.test(color) ? color.toLowerCase() : 'd83f84';
 }
 
 function readAttr(tag, name) {

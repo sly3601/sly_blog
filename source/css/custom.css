@@ -103,15 +103,39 @@
   }
 
   #recent-posts > .github-contrib-card {
+    position: relative;
     display: block;
     flex: 0 0 100%;
     width: 100%;
     padding: 22px 24px;
     overflow: hidden;
-    border: 1px solid rgba(255, 163, 201, 0.42);
+    border: 1px solid rgba(255, 255, 255, 0.46);
+    border-radius: 12px;
     background:
-      radial-gradient(circle at 12% 0%, rgba(255, 193, 218, 0.36), transparent 35%),
-      linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(255, 244, 249, 0.92));
+      linear-gradient(135deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.16)),
+      rgba(255, 255, 255, 0.08);
+    box-shadow:
+      0 20px 54px rgba(74, 50, 64, 0.12),
+      inset 0 1px 0 rgba(255, 255, 255, 0.56);
+    backdrop-filter: blur(18px) saturate(1.18);
+    -webkit-backdrop-filter: blur(18px) saturate(1.18);
+  }
+
+  #recent-posts > .github-contrib-card::before {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background:
+      linear-gradient(90deg, rgba(216, 63, 132, 0.18), transparent 34%, rgba(216, 63, 132, 0.08)),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.44), transparent 42%);
+    opacity: 0.54;
+    pointer-events: none;
+    content: "";
+  }
+
+  .github-contrib-card > * {
+    position: relative;
+    z-index: 1;
   }
 
   .github-contrib-head {
@@ -124,7 +148,7 @@
 
   .github-contrib-kicker {
     margin: 0 0 4px;
-    color: #d65f99;
+    color: #b52f6c;
     font-size: 0.76rem;
     font-weight: 900;
     letter-spacing: 0;
@@ -133,7 +157,7 @@
 
   .github-contrib-head h2 {
     margin: 0;
-    color: #5b3547;
+    color: #3f2632;
     font-size: 1.22rem;
     line-height: 1.2;
   }
@@ -144,25 +168,37 @@
     gap: 7px;
     min-height: 34px;
     padding: 0 11px;
-    border: 1px solid rgba(214, 95, 153, 0.36);
+    border: 1px solid rgba(143, 61, 99, 0.22);
     border-radius: 999px;
-    background: rgba(255, 255, 255, 0.72);
-    color: #9d3f70;
+    background: rgba(255, 255, 255, 0.34);
+    color: #7e3154;
     font-size: 0.82rem;
     font-weight: 800;
     white-space: nowrap;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.42);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
   }
 
   .github-contrib-link:hover {
-    color: #cf4c8a;
+    border-color: rgba(216, 63, 132, 0.34);
+    background: rgba(255, 255, 255, 0.46);
+    color: #c63578;
   }
 
   .github-contrib-chart {
     overflow-x: auto;
     padding: 12px;
-    border: 1px solid rgba(255, 193, 218, 0.46);
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.74);
+    border: 1px solid rgba(255, 255, 255, 0.38);
+    border-radius: 10px;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.14)),
+      rgba(255, 255, 255, 0.1);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.46),
+      0 10px 28px rgba(74, 50, 64, 0.08);
+    backdrop-filter: blur(14px) saturate(1.12);
+    -webkit-backdrop-filter: blur(14px) saturate(1.12);
   }
 
   .github-contrib-chart img {
@@ -494,10 +530,20 @@
   }
 
   [data-theme="dark"] #recent-posts > .github-contrib-card {
-    border-color: rgba(255, 143, 190, 0.32);
+    border-color: rgba(255, 255, 255, 0.12);
     background:
-      radial-gradient(circle at 12% 0%, rgba(255, 111, 171, 0.2), transparent 35%),
-      linear-gradient(135deg, rgba(24, 16, 21, 0.96), rgba(18, 18, 18, 0.96));
+      linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.035)),
+      rgba(16, 14, 18, 0.42);
+    box-shadow:
+      0 22px 58px rgba(0, 0, 0, 0.36),
+      inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  }
+
+  [data-theme="dark"] #recent-posts > .github-contrib-card::before {
+    background:
+      linear-gradient(90deg, rgba(216, 63, 132, 0.2), transparent 36%, rgba(255, 255, 255, 0.05)),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.12), transparent 48%);
+    opacity: 0.62;
   }
 
   [data-theme="dark"] .github-contrib-head h2 {
@@ -505,13 +551,19 @@
   }
 
   [data-theme="dark"] .github-contrib-link {
-    background: rgba(255, 143, 190, 0.12);
+    border-color: rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.06);
     color: #ffb5d0;
   }
 
   [data-theme="dark"] .github-contrib-chart {
-    border-color: rgba(255, 143, 190, 0.25);
-    background: rgba(255, 255, 255, 0.045);
+    border-color: rgba(255, 255, 255, 0.1);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.035)),
+      rgba(10, 10, 12, 0.2);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.1),
+      0 12px 30px rgba(0, 0, 0, 0.28);
   }
 
   [data-theme="dark"] #recent-posts > .daily-diary-card {

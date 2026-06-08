@@ -1,7 +1,7 @@
 (function () {
   const USERNAME = 'sly3601';
   const API_BASE = 'https://sly-skill-tree-api-pages.pages.dev/github-contributions.svg';
-  const PINK = 'ffc1da';
+  const PINK = 'd83f84';
   const ROOT = '/sly_blog/';
 
   function isHomePage() {
@@ -21,11 +21,38 @@
   function localFallbackUrl() {
     const svg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="700" height="124" viewBox="0 0 700 124" role="img" aria-label="GitHub contribution calendar unavailable">
-  <rect width="100%" height="100%" rx="10" fill="#fffafb"/>
+  <rect width="100%" height="100%" rx="10" fill="rgba(255,255,255,0.18)"/>
   <text x="24" y="56" fill="#8f5570" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="14" font-weight="700">暂时没有读到 @${USERNAME} 的 GitHub 贡献图</text>
   <text x="24" y="80" fill="#9b7284" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="12">刷新后会自动重试。</text>
 </svg>`;
     return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  }
+
+  function enhanceSvg(svg) {
+    return String(svg || '')
+      .replace(/fill="#fffafb"/gi, 'fill="rgba(255,255,255,0.12)"')
+      .replace(/#f4e7ee/gi, '#f3e5ec')
+      .replace(/#ffd2e4/gi, '#ee9bbb')
+      .replace(new RegExp(`#${PINK}`, 'gi'), '#d83f84')
+      .replace(/#f574ad/gi, '#b92869')
+      .replace(/#c93f80/gi, '#7f1f4e')
+      .replace(/#9b7284/gi, '#8d6c7a')
+      .replace(/#8f5570/gi, '#7e3154');
+  }
+
+  async function enhanceChartImage(image, card, url) {
+    try {
+      const response = await fetch(url, { mode: 'cors', cache: 'force-cache' });
+      if (!response.ok) return;
+
+      const svg = await response.text();
+      if (!/<svg[\s>]/i.test(svg)) return;
+
+      image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(enhanceSvg(svg))}`;
+      card.classList.add('is-enhanced');
+    } catch (error) {
+      // The original image URL remains usable when SVG enhancement is blocked.
+    }
   }
 
   function guardImageLoading(image, card) {
@@ -56,6 +83,7 @@
   }
 
   function createCard() {
+    const src = chartUrl();
     const card = document.createElement('section');
     card.id = 'github-contrib-card';
     card.className = 'github-contrib-card recent-post-item';
@@ -70,12 +98,13 @@
         </a>
       </div>
       <div class="github-contrib-chart" role="img" aria-label="${USERNAME} 的 GitHub 肝度图">
-        <img src="${chartUrl()}" alt="${USERNAME} 的 GitHub 肝度图" loading="lazy">
+        <img src="${src}" alt="${USERNAME} 的 GitHub 肝度图" loading="lazy">
       </div>
     `;
 
     const image = card.querySelector('img');
     guardImageLoading(image, card);
+    enhanceChartImage(image, card, src);
     return card;
   }
 
