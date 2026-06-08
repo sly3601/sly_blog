@@ -47,29 +47,29 @@
     const defs = `
   <defs>
     <linearGradient id="dropLevel0" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.68"/>
-      <stop offset="54%" stop-color="#ffffff" stop-opacity="0.24"/>
-      <stop offset="100%" stop-color="#cfa0b4" stop-opacity="0.16"/>
+      <stop offset="0%" stop-color="#f6e7ca" stop-opacity="0.56"/>
+      <stop offset="54%" stop-color="#c6aa86" stop-opacity="0.26"/>
+      <stop offset="100%" stop-color="#6b5038" stop-opacity="0.24"/>
     </linearGradient>
     <linearGradient id="dropLevel1" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#fff8fb" stop-opacity="0.74"/>
-      <stop offset="46%" stop-color="#eda9c5" stop-opacity="0.5"/>
-      <stop offset="100%" stop-color="#c24f82" stop-opacity="0.46"/>
+      <stop offset="0%" stop-color="#fff2cf" stop-opacity="0.78"/>
+      <stop offset="46%" stop-color="#d99b48" stop-opacity="0.62"/>
+      <stop offset="100%" stop-color="#985f2a" stop-opacity="0.68"/>
     </linearGradient>
     <linearGradient id="dropLevel2" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#fff4fa" stop-opacity="0.76"/>
-      <stop offset="44%" stop-color="#d66a9c" stop-opacity="0.64"/>
-      <stop offset="100%" stop-color="#9d3467" stop-opacity="0.62"/>
+      <stop offset="0%" stop-color="#ffe5a8" stop-opacity="0.82"/>
+      <stop offset="44%" stop-color="#c57827" stop-opacity="0.76"/>
+      <stop offset="100%" stop-color="#774018" stop-opacity="0.78"/>
     </linearGradient>
     <linearGradient id="dropLevel3" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#fff0f8" stop-opacity="0.78"/>
-      <stop offset="42%" stop-color="#b94178" stop-opacity="0.74"/>
-      <stop offset="100%" stop-color="#76234e" stop-opacity="0.74"/>
+      <stop offset="0%" stop-color="#ffd67a" stop-opacity="0.88"/>
+      <stop offset="42%" stop-color="#a95d1e" stop-opacity="0.84"/>
+      <stop offset="100%" stop-color="#56290f" stop-opacity="0.86"/>
     </linearGradient>
     <linearGradient id="dropLevel4" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#ffedf7" stop-opacity="0.82"/>
-      <stop offset="40%" stop-color="#852b5c" stop-opacity="0.84"/>
-      <stop offset="100%" stop-color="#45162f" stop-opacity="0.86"/>
+      <stop offset="0%" stop-color="#ffc857" stop-opacity="0.92"/>
+      <stop offset="40%" stop-color="#7f3f15" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#2d1408" stop-opacity="0.92"/>
     </linearGradient>
   </defs>`;
 
@@ -82,7 +82,7 @@
           .replace(/\sfill="[^"]*"/i, '')
           .replace(/\srx="[^"]*"/i, '');
 
-        return `<rect${cleanedAttrs} class="drop-cell drop-cell-${level}" rx="3.2" fill="url(#dropLevel${level})" stroke="#ffffff" stroke-opacity="0.42" stroke-width="0.55">${title}</rect>`;
+        return `<rect${cleanedAttrs} class="drop-cell drop-cell-${level}" rx="3.2" fill="url(#dropLevel${level})" stroke="#ffe0a6" stroke-opacity="0.38" stroke-width="0.55">${title}</rect>`;
       });
   }
 

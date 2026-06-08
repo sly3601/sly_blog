@@ -109,18 +109,19 @@
     width: 100%;
     padding: 22px 24px;
     overflow: hidden;
-    border: 1px solid #c89d67;
+    border: 1px solid rgba(221, 174, 105, 0.34);
     border-radius: 12px;
     background:
-      radial-gradient(ellipse at 18% 24%, rgba(255, 238, 203, 0.42), transparent 28%),
-      radial-gradient(ellipse at 82% 72%, rgba(109, 63, 31, 0.2), transparent 30%),
-      repeating-linear-gradient(92deg, rgba(96, 55, 27, 0.12) 0 1px, transparent 1px 9px),
-      linear-gradient(145deg, #f0cf9a 0%, #d9a86d 42%, #b7773f 100%),
-      #d9a86d;
+      radial-gradient(circle at 16% 0%, rgba(255, 200, 116, 0.32), transparent 32%),
+      radial-gradient(circle at 86% 18%, rgba(255, 230, 175, 0.13), transparent 26%),
+      linear-gradient(90deg, rgba(12, 7, 4, 0.46), transparent 18%, transparent 82%, rgba(8, 4, 3, 0.52)),
+      linear-gradient(180deg, rgba(33, 18, 10, 0.52), rgba(14, 8, 5, 0.92)),
+      url("/sly_blog/img/site/media-shelf-bg.jpg") center 44% / cover,
+      #160c07;
     box-shadow:
-      0 22px 48px rgba(84, 50, 28, 0.22),
-      inset 0 1px 0 rgba(255, 244, 218, 0.75),
-      inset 0 -1px 0 rgba(88, 48, 24, 0.22);
+      0 26px 64px rgba(18, 9, 4, 0.34),
+      inset 0 1px 0 rgba(255, 222, 166, 0.22),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.34);
   }
 
   #recent-posts > .github-contrib-card::before {
@@ -128,9 +129,9 @@
     inset: 0;
     border-radius: inherit;
     background:
-      linear-gradient(112deg, rgba(255, 246, 225, 0.5), transparent 23%),
-      linear-gradient(180deg, transparent 52%, rgba(91, 49, 23, 0.14));
-    opacity: 0.86;
+      linear-gradient(112deg, rgba(255, 227, 177, 0.2), transparent 26%),
+      linear-gradient(180deg, transparent 58%, rgba(6, 3, 2, 0.34));
+    opacity: 0.9;
     pointer-events: none;
     content: "";
   }
@@ -150,7 +151,7 @@
 
   .github-contrib-kicker {
     margin: 0 0 4px;
-    color: #7a3f1e;
+    color: #d8a86e;
     font-size: 0.76rem;
     font-weight: 900;
     letter-spacing: 0;
@@ -159,7 +160,8 @@
 
   .github-contrib-head h2 {
     margin: 0;
-    color: #3c2416;
+    color: #fff3dd;
+    text-shadow: 0 8px 24px rgba(0, 0, 0, 0.34);
     font-size: 1.22rem;
     line-height: 1.2;
   }
@@ -170,41 +172,44 @@
     gap: 7px;
     min-height: 34px;
     padding: 0 11px;
-    border: 1px solid rgba(93, 50, 23, 0.24);
+    border: 1px solid rgba(246, 222, 184, 0.18);
     border-radius: 999px;
     background:
-      linear-gradient(180deg, #f8deb3, #d89f62);
-    color: #583018;
+      linear-gradient(180deg, rgba(255, 229, 184, 0.15), rgba(58, 32, 17, 0.56)),
+      #22130b;
+    color: #f6d29d;
     font-size: 0.82rem;
     font-weight: 800;
     white-space: nowrap;
     box-shadow:
-      inset 0 1px 0 rgba(255, 247, 226, 0.72),
-      0 8px 18px rgba(84, 50, 28, 0.14);
+      inset 0 1px 0 rgba(255, 231, 188, 0.18),
+      0 8px 18px rgba(0, 0, 0, 0.2);
   }
 
   .github-contrib-link:hover {
-    border-color: rgba(93, 50, 23, 0.32);
+    border-color: rgba(216, 168, 110, 0.52);
     background:
-      linear-gradient(180deg, #ffe6bd, #d19354);
-    color: #432312;
+      linear-gradient(180deg, rgba(255, 223, 173, 0.22), rgba(91, 50, 24, 0.64)),
+      #2c180d;
+    color: #ffe6bd;
   }
 
   .github-contrib-chart {
     overflow-x: auto;
     padding: 12px;
-    border: 1px solid rgba(86, 47, 23, 0.24);
+    border: 1px solid rgba(232, 180, 112, 0.24);
     border-radius: 10px;
     background:
-      radial-gradient(ellipse at 18% 8%, rgba(255, 247, 229, 0.46), transparent 35%),
-      repeating-linear-gradient(88deg, rgba(112, 70, 34, 0.1) 0 1px, transparent 1px 8px),
-      linear-gradient(180deg, #f5deb7 0%, #e3ba82 48%, #c78a4d 100%),
-      #e3ba82;
+      radial-gradient(circle at 18% 0%, rgba(255, 207, 130, 0.18), transparent 34%),
+      linear-gradient(90deg, rgba(255, 222, 170, 0.06), rgba(12, 7, 4, 0.18) 15%, rgba(12, 7, 4, 0.2) 85%, rgba(255, 222, 170, 0.05)),
+      repeating-linear-gradient(90deg, rgba(255, 221, 160, 0.035) 0 1px, transparent 1px 10px),
+      linear-gradient(180deg, #3d2516 0%, #21120c 100%),
+      #21120c;
     box-shadow:
-      inset 0 1px 0 rgba(255, 248, 231, 0.78),
-      inset 0 0 0 1px rgba(255, 238, 204, 0.26),
-      inset 0 -12px 28px rgba(93, 50, 23, 0.12),
-      0 12px 28px rgba(84, 50, 28, 0.12);
+      inset 0 1px 0 rgba(255, 224, 176, 0.12),
+      inset 0 0 0 1px rgba(255, 238, 204, 0.05),
+      inset 0 -16px 34px rgba(0, 0, 0, 0.28),
+      0 16px 32px rgba(0, 0, 0, 0.24);
   }
 
   .github-contrib-chart img {
@@ -543,24 +548,25 @@
   }
 
   [data-theme="dark"] #recent-posts > .github-contrib-card {
-    border-color: #8e5e34;
+    border-color: rgba(221, 174, 105, 0.28);
     background:
-      radial-gradient(ellipse at 18% 24%, rgba(211, 143, 77, 0.28), transparent 28%),
-      radial-gradient(ellipse at 82% 72%, rgba(26, 14, 8, 0.34), transparent 30%),
-      repeating-linear-gradient(92deg, rgba(20, 10, 5, 0.18) 0 1px, transparent 1px 9px),
-      linear-gradient(145deg, #8d5b32 0%, #623818 48%, #3b2111 100%),
-      #623818;
+      radial-gradient(circle at 16% 0%, rgba(255, 200, 116, 0.24), transparent 32%),
+      radial-gradient(circle at 86% 18%, rgba(255, 230, 175, 0.09), transparent 26%),
+      linear-gradient(90deg, rgba(12, 7, 4, 0.54), transparent 18%, transparent 82%, rgba(8, 4, 3, 0.58)),
+      linear-gradient(180deg, rgba(24, 13, 8, 0.64), rgba(8, 5, 3, 0.94)),
+      url("/sly_blog/img/site/media-shelf-bg.jpg") center 44% / cover,
+      #120a07;
     box-shadow:
-      0 24px 58px rgba(0, 0, 0, 0.38),
-      inset 0 1px 0 rgba(255, 213, 151, 0.22),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.24);
+      0 24px 58px rgba(0, 0, 0, 0.42),
+      inset 0 1px 0 rgba(255, 213, 151, 0.16),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.34);
   }
 
   [data-theme="dark"] #recent-posts > .github-contrib-card::before {
     background:
-      linear-gradient(112deg, rgba(255, 214, 159, 0.18), transparent 25%),
-      linear-gradient(180deg, transparent 52%, rgba(10, 5, 3, 0.22));
-    opacity: 0.76;
+      linear-gradient(112deg, rgba(255, 227, 177, 0.16), transparent 26%),
+      linear-gradient(180deg, transparent 58%, rgba(6, 3, 2, 0.38));
+    opacity: 0.86;
   }
 
   [data-theme="dark"] .github-contrib-head h2 {
@@ -569,22 +575,25 @@
 
   [data-theme="dark"] .github-contrib-link {
     border-color: rgba(255, 214, 159, 0.18);
-    background: linear-gradient(180deg, #9e6939, #5d3216);
+    background:
+      linear-gradient(180deg, rgba(255, 229, 184, 0.13), rgba(58, 32, 17, 0.6)),
+      #1d1009;
     color: #ffe2b7;
   }
 
   [data-theme="dark"] .github-contrib-chart {
-    border-color: rgba(255, 214, 159, 0.16);
+    border-color: rgba(232, 180, 112, 0.2);
     background:
-      radial-gradient(ellipse at 18% 8%, rgba(222, 156, 85, 0.24), transparent 35%),
-      repeating-linear-gradient(88deg, rgba(18, 9, 5, 0.18) 0 1px, transparent 1px 8px),
-      linear-gradient(180deg, #8b5a30 0%, #613715 50%, #3c2110 100%),
-      #613715;
+      radial-gradient(circle at 18% 0%, rgba(255, 207, 130, 0.15), transparent 34%),
+      linear-gradient(90deg, rgba(255, 222, 170, 0.045), rgba(12, 7, 4, 0.2) 15%, rgba(12, 7, 4, 0.22) 85%, rgba(255, 222, 170, 0.04)),
+      repeating-linear-gradient(90deg, rgba(255, 221, 160, 0.03) 0 1px, transparent 1px 10px),
+      linear-gradient(180deg, #352014 0%, #160c07 100%),
+      #160c07;
     box-shadow:
-      inset 0 1px 0 rgba(255, 214, 159, 0.2),
-      inset 0 0 0 1px rgba(255, 214, 159, 0.08),
-      inset 0 -12px 28px rgba(0, 0, 0, 0.18),
-      0 12px 28px rgba(0, 0, 0, 0.3);
+      inset 0 1px 0 rgba(255, 214, 159, 0.12),
+      inset 0 0 0 1px rgba(255, 214, 159, 0.05),
+      inset 0 -16px 34px rgba(0, 0, 0, 0.3),
+      0 12px 28px rgba(0, 0, 0, 0.34);
   }
 
   [data-theme="dark"] #recent-posts > .daily-diary-card {
