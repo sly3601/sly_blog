@@ -1080,14 +1080,14 @@ footer_beautify:
 # 插入代码到头部 </head> 之前 和 底部 </body> 之前
 inject:
   head:
-    - <link rel="stylesheet" href="/sly_blog/css/custom.css?v=20260608-contrib-wood2" media="defer" onload="this.media='all'">
+    - <link rel="stylesheet" href="/sly_blog/css/custom.css?v=20260608-contrib-wood3" media="defer" onload="this.media='all'">
   bottom:
     # - <script src="xxxx"></script>
     - <div class="aplayer no-destroy" data-id="9338978599" data-server="tencent" data-type="playlist" data-order="list" data-fixed="true" data-preload="auto" data-autoplay="false" data-mutex="true" ></div>
     - <script defer src="/sly_blog/js/cursor.js"></script>
     - <script defer src="https://npm.elemecdn.com/jquery@latest/dist/jquery.min.js"></script>
     - <script defer data-pjax src="/sly_blog/js/cat.js"></script>
-    - <script defer data-pjax src="/sly_blog/js/github-contrib.js?v=20260608-contrib-wood2"></script>
+    - <script defer data-pjax src="/sly_blog/js/github-contrib.js?v=20260608-contrib-wood3"></script>
     - <script defer data-pjax src="/sly_blog/js/diary.js"></script>
 
     # aplayer音乐
