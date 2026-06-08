@@ -32,45 +32,48 @@
     const polished = String(svg || '')
       .replace(/fill="#fffafb"/gi, 'fill="#ffffff" fill-opacity="0.12"')
       .replace(/\s*<text[^>]*class="summary"[^>]*>[\s\S]*?<\/text>/gi, '')
-      .replace(/#f4e7ee/gi, '#f3e5ec')
-      .replace(/#ffd2e4/gi, '#ee9bbb')
+      .replace(/#f4e7ee/gi, '#5a4635')
+      .replace(/#ffd2e4/gi, '#b98742')
       .replace(new RegExp(`#${PINK}`, 'gi'), '#d83f84')
       .replace(/#f574ad/gi, '#b92869')
       .replace(/#c93f80/gi, '#7f1f4e')
-      .replace(/#9b7284/gi, '#8d6c7a')
-      .replace(/#8f5570/gi, '#7e3154');
+      .replace(/#9b7284/gi, '#b89b72')
+      .replace(/#8f5570/gi, '#cfaa70');
 
-    return glassContributionCells(polished);
+    return woodInlayContributionCells(polished);
   }
 
-  function glassContributionCells(svg) {
+  function woodInlayContributionCells(svg) {
     const defs = `
   <defs>
-    <linearGradient id="dropLevel0" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#f6e7ca" stop-opacity="0.56"/>
-      <stop offset="54%" stop-color="#c6aa86" stop-opacity="0.26"/>
-      <stop offset="100%" stop-color="#6b5038" stop-opacity="0.24"/>
+    <linearGradient id="inlayLevel0" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8a765c" stop-opacity="0.8"/>
+      <stop offset="48%" stop-color="#5f4d38" stop-opacity="0.86"/>
+      <stop offset="100%" stop-color="#312116" stop-opacity="0.92"/>
     </linearGradient>
-    <linearGradient id="dropLevel1" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#fff2cf" stop-opacity="0.78"/>
-      <stop offset="46%" stop-color="#d99b48" stop-opacity="0.62"/>
-      <stop offset="100%" stop-color="#985f2a" stop-opacity="0.68"/>
+    <linearGradient id="inlayLevel1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#d5b374" stop-opacity="0.94"/>
+      <stop offset="48%" stop-color="#a56a2e" stop-opacity="0.96"/>
+      <stop offset="100%" stop-color="#573015" stop-opacity="0.98"/>
     </linearGradient>
-    <linearGradient id="dropLevel2" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#ffe5a8" stop-opacity="0.82"/>
-      <stop offset="44%" stop-color="#c57827" stop-opacity="0.76"/>
-      <stop offset="100%" stop-color="#774018" stop-opacity="0.78"/>
+    <linearGradient id="inlayLevel2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e3bf72" stop-opacity="0.98"/>
+      <stop offset="46%" stop-color="#b46c23" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#63300f" stop-opacity="1"/>
     </linearGradient>
-    <linearGradient id="dropLevel3" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#ffd67a" stop-opacity="0.88"/>
-      <stop offset="42%" stop-color="#a95d1e" stop-opacity="0.84"/>
-      <stop offset="100%" stop-color="#56290f" stop-opacity="0.86"/>
+    <linearGradient id="inlayLevel3" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f0c660" stop-opacity="1"/>
+      <stop offset="43%" stop-color="#c9791f" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#6d2d0b" stop-opacity="1"/>
     </linearGradient>
-    <linearGradient id="dropLevel4" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#ffc857" stop-opacity="0.92"/>
-      <stop offset="40%" stop-color="#7f3f15" stop-opacity="0.9"/>
-      <stop offset="100%" stop-color="#2d1408" stop-opacity="0.92"/>
+    <linearGradient id="inlayLevel4" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffd56a" stop-opacity="1"/>
+      <stop offset="40%" stop-color="#d28a26" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#7c3108" stop-opacity="1"/>
     </linearGradient>
+    <filter id="inlayShadow" x="-25%" y="-25%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="0.7" stdDeviation="0.35" flood-color="#120805" flood-opacity="0.48"/>
+    </filter>
   </defs>`;
 
     return svg
@@ -82,7 +85,7 @@
           .replace(/\sfill="[^"]*"/i, '')
           .replace(/\srx="[^"]*"/i, '');
 
-        return `<rect${cleanedAttrs} class="drop-cell drop-cell-${level}" rx="3.2" fill="url(#dropLevel${level})" stroke="#ffe0a6" stroke-opacity="0.38" stroke-width="0.55">${title}</rect>`;
+        return `<rect${cleanedAttrs} class="wood-inlay-cell wood-inlay-cell-${level}" rx="1.7" fill="url(#inlayLevel${level})" stroke="#caa66b" stroke-opacity="0.34" stroke-width="0.45" filter="url(#inlayShadow)">${title}</rect>`;
       });
   }
 
@@ -91,7 +94,7 @@
     if (color.includes('7f1f4e')) return 4;
     if (color.includes('b92869')) return 3;
     if (color.includes('d83f84')) return 2;
-    if (color.includes('ee9bbb')) return 1;
+    if (color.includes('ee9bbb') || color.includes('b98742')) return 1;
     return 0;
   }
 
