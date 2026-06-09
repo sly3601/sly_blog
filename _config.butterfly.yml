@@ -890,7 +890,7 @@ pangu:
 # Lazyload (圖片懶加載)
 # https://github.com/verlok/vanilla-lazyload
 lazyload:
-  enable: false
+  enable: true
   field: site # site/post
   placeholder:
   blur: false
@@ -1080,7 +1080,12 @@ footer_beautify:
 # 插入代码到头部 </head> 之前 和 底部 </body> 之前
 inject:
   head:
-    - <link rel="stylesheet" href="/sly_blog/css/custom.css?v=20260609-diary-wood" media="defer" onload="this.media='all'">
+    - <link rel="preconnect" href="https://npm.elemecdn.com" crossorigin>
+    - <link rel="preconnect" href="https://cdn.cbd.int" crossorigin>
+    - <link rel="preconnect" href="https://s2.loli.net" crossorigin>
+    - <link rel="preconnect" href="https://sly-skill-tree-api-pages.pages.dev" crossorigin>
+    - <link rel="preload" as="image" href="/sly_blog/img/site/site-bg.jpg" fetchpriority="high">
+    - <link rel="stylesheet" href="/sly_blog/css/custom.css?v=20260609-load-diary-flat" media="defer" onload="this.media='all'">
   bottom:
     # - <script src="xxxx"></script>
     - <div class="aplayer no-destroy" data-id="9338978599" data-server="tencent" data-type="playlist" data-order="list" data-fixed="true" data-preload="auto" data-autoplay="false" data-mutex="true" ></div>
@@ -1089,6 +1094,7 @@ inject:
     - <script defer data-pjax src="/sly_blog/js/cat.js"></script>
     - <script defer data-pjax src="/sly_blog/js/github-contrib.js?v=20260608-wood-glow"></script>
     - <script defer data-pjax src="/sly_blog/js/diary.js"></script>
+    - <script defer data-pjax src="/sly_blog/js/image-loading.js?v=20260609-load-diary-flat"></script>
 
     # aplayer音乐
 
