@@ -1,3 +1,5 @@
+import {handlePrivateWorkspace} from '../../private-workspace/gateway.js';
+import {privateWorkspaceAssets} from '../../private-workspace/assets.js';
 const TREE_KEY = 'skill-tree:current';
 const NAV_SITES_KEY = 'navigator:sites';
 const MAX_BODY_BYTES = 1024 * 1024;
@@ -31,6 +33,10 @@ const DEFAULT_ALLOWED_ORIGINS = [
 
 export default {
   async fetch(request, env) {
+    const privateApi = await handlePrivateWorkspace(request, env);
+    if (privateApi) return privateApi;
+    const privateAssets = await privateWorkspaceAssets(request, env);
+    if (privateAssets) return privateAssets;
     const url = new URL(request.url);
 
     if (request.method === 'OPTIONS') {

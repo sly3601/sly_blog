@@ -10,3 +10,4 @@ Thumbs.db
 workers/**/wrangler.toml
 !workers/**/wrangler.toml.example
 !workers/skill-tree-pages/wrangler.toml
+!workers/private-workspace/wrangler.toml
